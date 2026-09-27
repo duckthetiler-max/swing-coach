@@ -15,7 +15,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   handed: 'right',
   model: 'full',
   factorDefault: 'auto',
-  protect: true,
+  protect: false,
   club: '7i',
   swingModel: 'neutral_rotary',
   protectStage: 1,
@@ -103,12 +103,14 @@ export function mergeSettings(current, patch) {
 
 /**
  * Settings saved before Simple mode existed belong to someone already used to the full
- * view, so they keep it. New installs (nothing saved) get the default, Simple mode on.
+ * view, so they keep it. New installs (nothing saved) get the defaults: Simple mode on,
+ * PROTECT off. Saved settings keep PROTECT as they had it, on if it was never stored.
  */
 export function upgradeStored(stored) {
   if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return stored;
-  if (Object.prototype.hasOwnProperty.call(stored, 'simpleMode')) return stored;
-  return { ...stored, simpleMode: false };
+  const has = (key) => Object.prototype.hasOwnProperty.call(stored, key);
+  if (has('simpleMode') && has('protect')) return stored;
+  return { ...stored, ...(has('simpleMode') ? {} : { simpleMode: false }), ...(has('protect') ? {} : { protect: true }) };
 }
 
 function storage() {

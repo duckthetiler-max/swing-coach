@@ -168,3 +168,11 @@ test('Simple mode is on for new installs and off for settings saved before it ex
   assert.equal(mergeSettings({ simpleMode: false }, { simpleMode: true }).simpleMode, true);
   assert.equal(mergeSettings({ simpleMode: true }, { simpleMode: 'yes' }).simpleMode, true, 'a bad value keeps the current one');
 });
+
+test('PROTECT is off for new installs and kept as it was for saved settings', () => {
+  assert.equal(DEFAULT_SETTINGS.protect, false);
+  assert.equal(mergeSettings(upgradeStored(null), null).protect, false);
+  assert.equal(mergeSettings(upgradeStored({ handed: 'left' }), null).protect, true, 'saved before the change: the old default, on');
+  assert.equal(mergeSettings(upgradeStored({ protect: true, simpleMode: true }), null).protect, true);
+  assert.equal(mergeSettings(upgradeStored({ protect: false }), null).protect, false);
+});
