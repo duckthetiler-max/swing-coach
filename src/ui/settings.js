@@ -14,8 +14,14 @@ export function renderSettings(root, ctx) {
   const model = SWING_MODELS[settings.swingModel] || SWING_MODELS.neutral_rotary;
   const stage = PROTECT.stages.find((s) => s.n === settings.protectStage) || PROTECT.stages[0];
 
-  root.replaceChildren(
-    el('div', { class: 'stack' },
+  const simple = settings.simpleMode === true;
+  const simpleCard = el('div', { class: 'card' },
+    switchRow('Simple mode', simple, (v) => onSave({ simpleMode: v }),
+      simple
+        ? 'On. One tip, one drill and plain words. Every number is still one tap away under "Show me the details".'
+        : 'Off. The full view: every number, band and picture up front.'));
+
+  const cards = [
       el('div', { class: 'card' },
         el('div', { class: 'eyebrow' }, 'You'),
         field('Your height in cm', height, 'Turns pixel distances into real centimetres. Blank means the tracker guesses your size.'),
@@ -76,8 +82,27 @@ export function renderSettings(root, ctx) {
         el('div', { class: 'eyebrow' }, 'About'),
         listRow('Where the numbers come from', 'Every band, its tier and its sources. The coach only comments on what it measured.', null, onKnowledge),
         el('p', { class: 'muted small', style: { marginTop: '10px' } }, 'Clips never leave the phone. Saved swings live in this browser only.')),
+  ];
 
-      appCard(app, build)));
+  if (!simple) {
+    root.replaceChildren(el('div', { class: 'stack' }, simpleCard, ...cards, appCard(app, build)));
+    return;
+  }
+
+  // Simple mode: who you are and your bag on top, everything technical folded under Advanced.
+  const [, bagCard, ...advanced] = cards;
+  const you = el('div', { class: 'card' },
+    el('div', { class: 'eyebrow' }, 'About you'),
+    field('Which way do you swing?', segmented([['right', 'Right-handed'], ['left', 'Left-handed']], settings.handed, (v) => onSave({ handed: v }), 'Which way do you swing?'),
+      'Right-handed golfers stand with their left side toward the target.'),
+    field('Your height in cm (optional)', height, 'Helps turn the video into real distances. Leave it blank and the app makes a guess.'));
+  const modelCard = el('div', { class: 'card' },
+    field('Swing model', select(modelOptions, settings.swingModel, (v) => onSave({ swingModel: v })),
+      `${model.summary} The app never guesses a named method from video; pick one only if you are working on it with a coach.`));
+  root.replaceChildren(el('div', { class: 'stack' },
+    you, bagCard, simpleCard,
+    el('details', { class: 'more' }, el('summary', {}, 'Advanced'), el('div', { class: 'stack' }, modelCard, ...advanced)),
+    appCard(app, build)));
 }
 
 function bagPicker(settings, onSave) {

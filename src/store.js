@@ -25,6 +25,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   camera: 'environment',
   bag: DEFAULT_BAG,
   overlayStyle: 'markers',
+  simpleMode: true,
 });
 
 export const HANDED_OPTIONS = ['right', 'left'];
@@ -71,6 +72,7 @@ export function normaliseSetting(key, value) {
       return LIVE_MODEL_OPTIONS.includes(value) ? value : undefined;
     case 'speakCue':
     case 'coachHeadline':
+    case 'simpleMode':
       return typeof value === 'boolean' ? value : undefined;
     case 'camera':
       return CAMERA_OPTIONS.includes(value) ? value : undefined;
@@ -99,6 +101,16 @@ export function mergeSettings(current, patch) {
   return out;
 }
 
+/**
+ * Settings saved before Simple mode existed belong to someone already used to the full
+ * view, so they keep it. New installs (nothing saved) get the default, Simple mode on.
+ */
+export function upgradeStored(stored) {
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return stored;
+  if (Object.prototype.hasOwnProperty.call(stored, 'simpleMode')) return stored;
+  return { ...stored, simpleMode: false };
+}
+
 function storage() {
   try {
     return globalThis.localStorage || null;
@@ -118,7 +130,7 @@ export function getSettings() {
       parsed = null;
     }
   }
-  return mergeSettings(parsed, null);
+  return mergeSettings(upgradeStored(parsed), null);
 }
 
 export function saveSettings(patch) {

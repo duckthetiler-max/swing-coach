@@ -3,11 +3,12 @@ import { el, svg, chips, select, listRow, clubLabel, viewLabel, fmtDate, fmt } f
 import { CLUB_LIST } from '../clubs.js';
 import { listSwings } from '../store.js';
 import { NORMS, METRIC_IDS } from '../norms.js';
+import { simpleViewLabel } from '../simple.js';
 
 const state = { club: 'all', view: 'all' };
 
 export async function renderHistory(root, ctx) {
-  const { onOpen } = ctx;
+  const { onOpen, simple } = ctx;
   root.replaceChildren(el('p', { class: 'muted' }, 'Loading saved swings'));
   let all = [];
   try { all = await listSwings(); } catch (err) { root.replaceChildren(el('p', { class: 'muted' }, `Could not read saved swings: ${err.message}`)); return; }
@@ -15,12 +16,20 @@ export async function renderHistory(root, ctx) {
   const rows = all.filter((r) => (state.club === 'all' || r.club === state.club) && (state.view === 'all' || r.view === state.view));
   const rerender = () => renderHistory(root, ctx);
 
+  // Simple mode names each swing by its cue, the thing to do, rather than the fault.
+  const titleOf = (h) => (simple ? h.cue || h.title : h.title);
   const list = rows.length
     ? rows.map((r) => listRow(
-      r.coaching && r.coaching.headline ? r.coaching.headline.title : 'Swing',
-      `${fmtDate(r.date)}. ${clubLabel(r.club)}, ${viewLabel(r.view)}${r.note ? `. ${r.note}` : ''}`,
+      r.coaching && r.coaching.headline ? titleOf(r.coaching.headline) : 'Swing',
+      simple
+        ? `${fmtDate(r.date)} · ${clubLabel(r.club)}${r.note ? ` · ${r.note}` : ''}`
+        : `${fmtDate(r.date)}. ${clubLabel(r.club)}, ${viewLabel(r.view)}${r.note ? `. ${r.note}` : ''}`,
       null, () => onOpen(r.id)))
-    : [el('div', { class: 'card muted' }, all.length ? 'No saved swings match this filter.' : 'No saved swings yet. Analyse a clip and save it to start a history.')];
+    : [el('div', { class: 'card muted' }, all.length ? 'No saved swings match this filter.' : simple ? 'No saved swings yet. Check a swing and save it to start your history.' : 'No saved swings yet. Analyse a clip and save it to start a history.')];
+  const angles = simple
+    ? [['all', 'All'], ['dtl', simpleViewLabel('dtl')], ['fo', simpleViewLabel('fo')]]
+    : [['all', 'All'], ['fo', 'Face-on'], ['dtl', 'Down-the-line']];
+  const trends = renderTrends(rows);
 
   root.replaceChildren(
     el('div', { class: 'stack' },
@@ -28,9 +37,9 @@ export async function renderHistory(root, ctx) {
         el('div', { class: 'field' }, el('span', { class: 'field-label' }, 'Club'),
           select([['all', 'All clubs'], ...CLUB_LIST.filter((c) => all.some((r) => r.club === c.id)).map((c) => [c.id, c.label])], state.club, (v) => { state.club = v; rerender(); })),
         el('div', { class: 'field' }, el('span', { class: 'field-label' }, 'Angle'),
-          chips([['all', 'All'], ['fo', 'Face-on'], ['dtl', 'Down-the-line']], state.view, (v) => { state.view = v; rerender(); }))),
+          chips(angles, state.view, (v) => { state.view = v; rerender(); }))),
       ...list,
-      renderTrends(rows)));
+      simple ? el('details', { class: 'more' }, el('summary', {}, 'Trends, for keen players'), trends) : trends));
 }
 
 function renderTrends(rows) {

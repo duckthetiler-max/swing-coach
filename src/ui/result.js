@@ -1,12 +1,18 @@
 // Result screen: the one thing, the report card, frozen positions, the scrubber.
+// Simple mode puts a plain-words summary on top and folds all of that under "Show me the details".
 import { el, button, segmented, select, ANGLE_OPTIONS, PHASES, clubLabel, viewLabel, fmtDate, confidenceWord, toast } from './dom.js';
 import { NORMS, NORMS_DISCLAIMER } from '../norms.js';
 import { fmtValue, fmtUncertainty } from '../coach.js';
 import { drawBody, drawGuides, drawCallouts } from '../overlay.js';
 import { calloutsFor } from '../markers.js';
 import { seekTo } from '../video.js';
+import { simpleResult } from '../simple.js';
+import { simpleResultView } from './simple.js';
 
 const PHASE_KEYS = ['p1', 'p4', 'p7', 'p10'];
+
+// Which swing's details are unfolded, so a re-render (new angle, new pictures) keeps them open.
+let openDetailsFor = null;
 
 export function renderResult(root, ctx) {
   const { mode, analysis, coaching, stills, club, settings, actions, record, live } = ctx;
@@ -93,11 +99,40 @@ export function renderResult(root, ctx) {
     try { await actions.save(noteInput.value.trim()); saveBtn.textContent = 'Saved'; saveBtn.disabled = true; toast('Saved to history'); } catch (err) { toast(`Could not save: ${err.message}`); }
   }, 'btn primary');
   if (mode === 'live' && live.saved) { saveBtn.textContent = 'Saved'; saveBtn.disabled = true; }
+  const simple = settings.simpleMode === true;
+  const anotherLabel = live && live.captured ? 'Back to the session' : simple ? 'Check another swing' : 'Analyse another';
   const actionbar = mode === 'live'
-    ? el('div', { class: 'actionbar' }, button(live.captured ? 'Back to the session' : 'Analyse another', () => actions.another(), 'btn'), saveBtn)
+    ? el('div', { class: 'actionbar' }, button(anotherLabel, () => actions.another(), 'btn'), saveBtn)
     : el('div', { class: 'actionbar' }, button('Delete', () => actions.remove(), 'btn danger'), button('Back to history', () => actions.back(), 'btn'));
 
-  root.replaceChildren(el('div', { class: 'stack' }, header, protectCard, headline, warnings, report, stillsCard, scrub, noteCard, actionbar));
+  const full = [header, protectCard, headline, warnings, report, stillsCard, scrub, noteCard];
+  if (!simple) {
+    root.replaceChildren(el('div', { class: 'stack' }, ...full, actionbar));
+    return;
+  }
+
+  const model = simpleResult(analysis, coaching, { handed: analysis.handed || settings.handed, club, model: analysis.model, coachingOn });
+  const meta = [clubLabel(club), model.viewLabel, record ? fmtDate(record.date) : null].filter(Boolean).join(' · ');
+  const top = simpleResultView(model, {
+    meta,
+    unvalidated: !!(coaching.context && coaching.context.unvalidated),
+    warnings: analysis.quality && analysis.quality.warnings,
+    onPickView: mode === 'live' ? (v) => actions.setView(v) : null,
+  });
+  root.replaceChildren(el('div', { class: 'stack' }, ...top, detailsFold(full, mode === 'live' ? live.clip : record), actionbar));
+}
+
+/** Everything the full view shows, folded away until asked for. key: the swing it belongs to. */
+function detailsFold(parts, key) {
+  const open = !!key && openDetailsFor === key;
+  const summary = el('summary', {}, open ? 'Hide the details' : 'Show me the details');
+  const fold = el('details', { class: 'more', open }, summary, el('div', { class: 'stack' }, parts));
+  fold.addEventListener('toggle', () => {
+    summary.textContent = fold.open ? 'Hide the details' : 'Show me the details';
+    if (fold.open) openDetailsFor = key;
+    else if (openDetailsFor === key) openDetailsFor = null;
+  });
+  return fold;
 }
 
 function metricCard(m) {

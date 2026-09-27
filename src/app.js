@@ -21,7 +21,7 @@ import { openCamera, closeCamera, cameraSettings, LiveCapture, retrackPictures, 
 import { buildLiveClip } from './live.js';
 import { renderCapture, paintLive, refreshLiveCounters } from './ui/capture.js';
 
-export const BUILD = '2026-09-17.5';
+export const BUILD = '2026-09-27.1';
 
 const root = document.getElementById('app');
 const state = {
@@ -104,7 +104,7 @@ async function route() {
       break;
     case 'history':
       setChrome({ title: 'History', tab: 'history' });
-      await renderHistory(root, { onOpen: (id) => nav(`#result/${id}`) });
+      await renderHistory(root, { onOpen: (id) => nav(`#result/${id}`), simple: state.settings.simpleMode });
       break;
     case 'settings':
       setChrome({ title: 'Settings', tab: 'settings' });
@@ -465,7 +465,8 @@ async function analyze(src) {
       fps, maxSamples: 360, signal: abort.signal,
       onProgress: (pct, label) => updateProgress({ pct, label }),
     });
-    await finishAnalysis({ video, clip, club: s.club, viewChoice: state.viewChoice, demo: false });
+    // Simple mode hides the angle picker, so it always reads the angle from the swing.
+    await finishAnalysis({ video, clip, club: s.club, viewChoice: s.simpleMode ? 'auto' : state.viewChoice, demo: false });
   } catch (err) {
     if (err && err.name === 'AbortError') { if (video) releaseVideo(video); nav('#home'); return; }
     console.error(err);
