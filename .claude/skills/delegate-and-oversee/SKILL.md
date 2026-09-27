@@ -1,6 +1,6 @@
 ---
 name: delegate-and-oversee
-description: Default working mode for every Claude Code session. The main session is the overseer on the strongest model - it frames the task, makes the judgment calls, writes precise briefs and reviews every result - while searching, reading, routine coding and test runs are delegated down to cheaper-model subagents (Haiku, Sonnet). Same quality, far fewer top-model tokens. Use this at the start of any coding, debugging, research or multi-step task - anything bigger than a one-line edit or a single lookup - and whenever you are about to spawn a subagent or pick a model for one, even if the user never mentions delegation, models or tokens.
+description: Default working mode for every Claude Code session. The main session is the overseer on a top-tier model (Opus or Fable) - it frames the task, makes the judgment calls, writes precise briefs and reviews every result - while searching, reading, routine coding and test runs are delegated down to cheaper-model subagents (Haiku, Sonnet). Same quality, far fewer top-model tokens. Use this at the start of any coding, debugging, research or multi-step task - anything bigger than a one-line edit or a single lookup - and whenever you are about to spawn a subagent or pick a model for one, even if the user never mentions delegation, models or tokens.
 ---
 
 # Delegate and oversee
@@ -16,6 +16,9 @@ Why this saves tokens: every file, search hit and log the overseer reads stays i
 its context and is paid for again, at top-model rates, on every later turn. A
 subagent reads that material on a cheaper model and hands back a short
 conclusion, so the expensive context stays small for the rest of the session.
+It only pays when there is bulk to hand off, though. A short chain of dependent
+steps that fits comfortably in context is cheaper to just do: the brief, the
+handoff and the review would cost more than they save.
 
 ## The team
 
@@ -24,13 +27,18 @@ conclusion, so the expensive context stays small for the rest of the session.
 | `scout` | Haiku | Finding code, "where/how is X done?", reading and summarizing files, docs, logs. Read-only. |
 | `checker` | Haiku | Running tests, lint, type-checks, builds. Reports only what failed and why. |
 | `builder` | Sonnet | Implementing a change from a clear spec; writing or updating tests. |
-| `reviewer` | Opus | Fresh-eyes review of large or risky changes, and the final review whenever the session itself is not on the top model. |
+| `reviewer` | Fable | Fresh-eyes review of large or risky changes, and the final review whenever the session itself runs on Sonnet or Haiku. |
 
-These are defined in `.claude/agents/`. In a repo that doesn't have them, use a
-built-in agent type and set `model` on the call: `Explore` or `general-purpose`
-with `haiku` for scout and checker jobs, `general-purpose` with `sonnet` for
-builder jobs, `general-purpose` with `opus` for review. An agent with no model
-set inherits the session's model, which quietly undoes the saving.
+List prices per million input/output tokens (September 2026): Haiku 4.5 $1/$5,
+Sonnet 5 $2/$10, Opus 5.5 $4/$20, Fable 5.1 $10/$50. Fable is the most capable.
+"Top tier" below means Opus or Fable.
+
+These agents are defined in `.claude/agents/`. In a repo that doesn't have them,
+use `general-purpose` and set `model` on the call: `haiku` for scout and checker
+jobs, `sonnet` for builder jobs, `fable` for review. Always set `model` on
+built-in agents: `Explore`, `Plan` and `general-purpose` inherit the session's
+model by default, so an unqualified search quietly runs at top-model rates. If
+Fable isn't available on the account, use `opus` wherever this skill says `fable`.
 
 ## What the overseer keeps
 
@@ -43,9 +51,9 @@ set inherits the session's model, which quietly undoes the saving.
   Every subagent starts with a fixed overhead of several thousand tokens, so
   tiny jobs cost more delegated than done.
 
-If this session is not running on the top model, send the judgment up instead
-of doing it at a lower tier: a design you are unsure of goes to a top-tier agent
-(`Plan` with model `opus`), and the final review always goes to `reviewer`.
+If this session is running on Sonnet or Haiku, send the judgment up instead of
+doing it at a lower tier: a design you are unsure of goes to `Plan` with model
+`fable`, and the final review always goes to `reviewer`.
 
 ## The loop
 
@@ -72,7 +80,7 @@ of doing it at a lower tier: a design you are unsure of goes to a top-tier agent
   commands and report, apply an exact edit (rename, move, find-and-replace).
 - **Sonnet**: ordinary engineering from a clear spec. Implement a feature or a
   fix with a known cause, write tests, refactor within a module, write docs.
-- **Top model**: ambiguity or high stakes. Unclear requirements, design, hard
+- **Top tier (Opus, Fable)**: ambiguity or high stakes. Unclear requirements, design, hard
   debugging, security-sensitive code, final review, and anything that already
   failed at a lower tier.
 
