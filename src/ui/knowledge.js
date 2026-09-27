@@ -1,9 +1,9 @@
 // Knowledge screen: where every number comes from, what the app cannot see, the swing
-// models, setups, faults, tour and lab references, practice science and PROTECT evidence.
+// models, setups, faults, tour and lab references, and practice science.
 import { el } from './dom.js';
 import {
   SOURCES, TIERS, NOT_VISIBLE, NOT_VISIBLE_SOURCES, SWING_MODELS, SETUP_BY_CLUB, FAULTS, BALL_FLIGHT,
-  TOUR_REFERENCES, KINEMATICS, PROTECT, PRACTICE, CAPTURE,
+  TOUR_REFERENCES, KINEMATICS, PRACTICE, CAPTURE,
 } from '../knowledge.js';
 import { NORMS, ALL_METRIC_IDS, NORMS_DISCLAIMER } from '../norms.js';
 import { DRILLS } from '../drills.js';
@@ -95,7 +95,7 @@ export function renderKnowledge(root) {
       section('Drills and their evidence', false,
         el('p', { class: 'small muted' }, 'No controlled trial exists for any named swing drill. These are the drills most prescribed by TPI, GOLFTEC and top teachers, written to the practice-science rules: one cue, ball count first, done-when stated.'),
         ...Object.values(DRILLS).map((d) => el('div', { class: 'metric' },
-          el('div', { class: 'metric-head' }, el('span', { class: 'metric-label' }, d.title), el('span', { class: 'pill na' }, d.protectSafe ? 'protect safe' : 'skipped in protect')),
+          el('div', { class: 'metric-head' }, el('span', { class: 'metric-label' }, d.title), el('span', { class: 'pill na' }, `lead arm load: ${d.leadArmLoad}`)),
           el('div', { class: 'metric-note' }, el('strong', {}, 'Cue: '), d.cue),
           el('div', { class: 'metric-note' }, d.setup),
           sourceList(d.sources)))),
@@ -108,13 +108,7 @@ export function renderKnowledge(root) {
       section('How to film, and the slow motion trap', false,
         el('ol', {}, CAPTURE.steps.map((s) => el('li', {}, s))),
         el('p', { class: 'small muted' }, CAPTURE.slowMotion),
-        sourceList(CAPTURE.sources)),
-
-      section('PROTECT mode evidence', false,
-        el('p', {}, PROTECT.disclaimer),
-        el('p', { class: 'small' }, PROTECT.painRule),
-        el('p', { class: 'small' }, PROTECT.lines.followThrough),
-        sourceList(PROTECT.sources))));
+        sourceList(CAPTURE.sources))));
 }
 
 export function setupBlock(s) {

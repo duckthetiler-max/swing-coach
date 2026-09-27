@@ -1,7 +1,7 @@
 // Settings screen.
 import { el, field, select, switchRow, segmented, button, listRow } from './dom.js';
 import { renderHowto } from './howto.js';
-import { SWING_MODELS, PROTECT } from '../knowledge.js';
+import { SWING_MODELS } from '../knowledge.js';
 import { CLUB_LIST, GROUPS, normaliseBag } from '../clubs.js';
 
 export function renderSettings(root, ctx) {
@@ -12,10 +12,15 @@ export function renderSettings(root, ctx) {
 
   const modelOptions = Object.entries(SWING_MODELS).map(([id, m]) => [id, m.name]);
   const model = SWING_MODELS[settings.swingModel] || SWING_MODELS.neutral_rotary;
-  const stage = PROTECT.stages.find((s) => s.n === settings.protectStage) || PROTECT.stages[0];
 
-  root.replaceChildren(
-    el('div', { class: 'stack' },
+  const simple = settings.simpleMode === true;
+  const simpleCard = el('div', { class: 'card' },
+    switchRow('Simple mode', simple, (v) => onSave({ simpleMode: v }),
+      simple
+        ? 'On. One tip, one drill and plain words. Every number is still one tap away under "Show me the details".'
+        : 'Off. The full view: every number, band and picture up front.'));
+
+  const cards = [
       el('div', { class: 'card' },
         el('div', { class: 'eyebrow' }, 'You'),
         field('Your height in cm', height, 'Turns pixel distances into real centimetres. Blank means the tracker guesses your size.'),
@@ -53,31 +58,33 @@ export function renderSettings(root, ctx) {
             ? 'On. One headline, only when a number is clearly outside its band once the doubt is counted, and marked as not yet validated.'
             : 'Off. Numbers and pictures only. The stricter choice until your own footage has validated the measurements.')),
 
-      el('div', { class: 'card stack' },
-        el('div', {}, el('div', { class: 'eyebrow' }, 'Lead arm'), el('h2', {}, 'PROTECT mode')),
-        switchRow('PROTECT mode', settings.protect, (v) => onSave({ protect: v }),
-          settings.protect ? 'On. Volume and shot order are managed, no speed drills, a bent lead arm is reported but not coached.' : 'Off. Full coaching, including the lead arm.'),
-        el('p', { class: 'small muted' }, PROTECT.disclaimer),
-        field('Return-to-golf stage', select(PROTECT.stages.map((s) => [String(s.n), `Stage ${s.n}: ${s.name}`]), String(settings.protectStage), (v) => onSave({ protectStage: Number(v) })),
-          PROTECT.stageRule),
-        el('div', { class: 'metric' },
-          el('div', { class: 'metric-label' }, `Stage ${stage.n}: ${stage.name}`),
-          el('ol', {}, stage.sessions.map((s, i) => el('li', {}, `Session ${'ABC'[i]}: ${s}`)))),
-        el('details', {}, el('summary', {}, 'What PROTECT mode says'),
-          el('ul', {}, ['on', 'stop', 'warmUp', 'volume', 'order', 'surface', 'followThrough', 'morning', 'work', 'progress', 'off'].map((k) => el('li', { class: 'small' }, PROTECT.lines[k])))),
-        el('details', {}, el('summary', {}, 'Red flags: get it looked at'),
-          el('ul', {}, PROTECT.redFlags.map((s) => el('li', {}, s))),
-          el('p', { class: 'small muted' }, PROTECT.redFlagFooter)),
-        el('p', { class: 'small' }, PROTECT.lines.off)),
-
       renderHowto(true),
 
       el('div', { class: 'card' },
         el('div', { class: 'eyebrow' }, 'About'),
         listRow('Where the numbers come from', 'Every band, its tier and its sources. The coach only comments on what it measured.', null, onKnowledge),
         el('p', { class: 'muted small', style: { marginTop: '10px' } }, 'Clips never leave the phone. Saved swings live in this browser only.')),
+  ];
 
-      appCard(app, build)));
+  if (!simple) {
+    root.replaceChildren(el('div', { class: 'stack' }, simpleCard, ...cards, appCard(app, build)));
+    return;
+  }
+
+  // Simple mode: who you are and your bag on top, everything technical folded under Advanced.
+  const [, bagCard, ...advanced] = cards;
+  const you = el('div', { class: 'card' },
+    el('div', { class: 'eyebrow' }, 'About you'),
+    field('Which way do you swing?', segmented([['right', 'Right-handed'], ['left', 'Left-handed']], settings.handed, (v) => onSave({ handed: v }), 'Which way do you swing?'),
+      'Right-handed golfers stand with their left side toward the target.'),
+    field('Your height in cm (optional)', height, 'Helps turn the video into real distances. Leave it blank and the app makes a guess.'));
+  const modelCard = el('div', { class: 'card' },
+    field('Swing model', select(modelOptions, settings.swingModel, (v) => onSave({ swingModel: v })),
+      `${model.summary} The app never guesses a named method from video; pick one only if you are working on it with a coach.`));
+  root.replaceChildren(el('div', { class: 'stack' },
+    you, bagCard, simpleCard,
+    el('details', { class: 'more' }, el('summary', {}, 'Advanced'), el('div', { class: 'stack' }, modelCard, ...advanced)),
+    appCard(app, build)));
 }
 
 function bagPicker(settings, onSave) {

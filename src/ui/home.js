@@ -1,9 +1,15 @@
 // Home screen: pick a clip, choose the club and angle, today's plan, setup for the club.
-import { el, button, segmented, switchRow, listRow, clubStrip, ANGLE_OPTIONS, clubLabel, viewLabel, fmtDate } from './dom.js';
+// Simple mode: a welcome, the club, one big button, how to film, and a tip of the day.
+import { el, button, segmented, listRow, clubStrip, ANGLE_OPTIONS, clubLabel, viewLabel, fmtDate } from './dom.js';
 import { clubsToOffer, clubGroup } from '../clubs.js';
 import { renderHowto } from './howto.js';
-import { PROTECT, PRACTICE, SETUP_BY_CLUB } from '../knowledge.js';
+import { PRACTICE, SETUP_BY_CLUB } from '../knowledge.js';
 import { setupBlock } from './knowledge.js';
+import { tipOfTheDay, greeting } from '../simple.js';
+import { heroCard, filmCard, tipCard } from './simple.js';
+
+// How many times "Next tip" was pressed this visit.
+let tipOffset = 0;
 
 export function renderHome(root, ctx) {
   const { settings, viewChoice, lastRecord, app, onPick, onCapture, onSetting, onViewChoice, onOpenLast, onKnowledge } = ctx;
@@ -12,6 +18,11 @@ export function renderHome(root, ctx) {
   fileInput.addEventListener('change', () => { if (fileInput.files && fileInput.files[0]) onPick(fileInput.files[0]); fileInput.value = ''; });
   const camInput = el('input', { type: 'file', accept: 'video/*', capture: 'environment', style: { display: 'none' } });
   camInput.addEventListener('change', () => { if (camInput.files && camInput.files[0]) onPick(camInput.files[0]); camInput.value = ''; });
+
+  if (settings.simpleMode) {
+    renderSimpleHome(root, ctx, fileInput, camInput);
+    return;
+  }
 
   const hero = el('div', { class: 'card stack' },
     el('div', {},
@@ -28,10 +39,6 @@ export function renderHome(root, ctx) {
     el('div', { class: 'row', style: { justifyContent: 'center' } }, button('Record one clip with the camera app', () => camInput.click(), 'btn link')),
     fileInput, camInput);
 
-  const protectRow = el('div', { class: 'card', style: { paddingTop: '6px', paddingBottom: '6px' } },
-    switchRow('PROTECT mode', settings.protect, (v) => onSetting({ protect: v }),
-      settings.protect ? 'On. No speed drills. Stop if the lead arm hurts.' : 'Off. Full coaching, including the lead arm.'));
-
   const install = app && app.canInstall
     ? el('div', { class: 'banner' },
       el('div', { class: 'text' }, el('div', { style: { fontWeight: 600 } }, 'Put it on your home screen'), el('div', { class: 'small muted' }, 'Opens full screen like an app and works offline at the range.')),
@@ -46,9 +53,8 @@ export function renderHome(root, ctx) {
   root.replaceChildren(
     el('div', { class: 'stack' },
       hero,
-      protectRow,
       install,
-      sessionPlan(settings),
+      sessionPlan(),
       last,
       el('details', { class: 'card' }, el('summary', {}, `Setting up with the ${clubLabel(settings.club).toLowerCase()}`),
         setupBlock(SETUP_BY_CLUB[clubGroup(settings.club)] || SETUP_BY_CLUB.midIron)),
@@ -56,22 +62,50 @@ export function renderHome(root, ctx) {
       listRow('Where the numbers come from', 'Every band, its tier and its sources.', null, onKnowledge)));
 }
 
-function sessionPlan(settings) {
-  if (settings.protect) {
-    const stage = PROTECT.stages.find((s) => s.n === settings.protectStage) || PROTECT.stages[0];
-    return el('div', { class: 'card warn stack' },
-      el('div', {}, el('div', { class: 'eyebrow' }, "Today's plan"), el('h2', {}, `Stage ${stage.n}, ${stage.name.toLowerCase()}`)),
-      el('p', { class: 'what', style: { fontWeight: 600 } }, PROTECT.lines.stop),
-      el('ol', {}, stage.sessions.map((s, i) => el('li', {}, `Session ${'ABC'[i]}: ${s}`))),
-      el('p', { class: 'small' }, 'Pick the session you have not done this week. Every other day, three a week.'),
-      el('p', { class: 'small muted' }, PROTECT.lines.warmUp),
-      el('p', { class: 'small muted' }, PROTECT.lines.surface),
-      el('details', {}, el('summary', {}, 'Red flags'),
-        el('ul', {}, PROTECT.redFlags.map((f) => el('li', {}, f))),
-        el('p', { class: 'small muted' }, PROTECT.redFlagFooter)),
-      el('p', { class: 'small muted' }, 'Change the stage in Settings when you finish one cleanly.'));
-  }
+function sessionPlan() {
   return el('details', { class: 'card' }, el('summary', {}, 'A range session that sticks'),
     el('ol', {}, PRACTICE.session.map((b) => el('li', {}, el('strong', {}, `${b.name}. `), b.detail))),
     el('p', { class: 'small muted' }, `${PRACTICE.videoNote} ${PRACTICE.frequency}`));
+}
+
+function renderSimpleHome(root, ctx, fileInput, camInput) {
+  const { settings, lastRecord, app, onSetting, onOpenLast } = ctx;
+
+  const start = el('div', { class: 'card stack' },
+    el('div', { class: 'field' },
+      el('h2', { class: 'section-title', style: { margin: 0 } }, 'Which club are you hitting?'),
+      clubStrip(clubsToOffer(settings.bag, settings.club), settings.club, (v) => onSetting({ club: v }))),
+    button('Check my swing', () => fileInput.click(), 'btn primary big'),
+    el('div', { class: 'row', style: { justifyContent: 'center', marginTop: '6px' } }, button('Film a new swing now', () => camInput.click(), 'btn link')),
+    fileInput, camInput);
+
+  const install = app && app.canInstall
+    ? el('div', { class: 'banner' },
+      el('div', { class: 'text' }, el('div', { style: { fontWeight: 600 } }, 'Put it on your home screen'), el('div', { class: 'muted' }, 'Opens like an app and works at the range without signal.')),
+      button('Add', () => app.install(), 'btn primary'))
+    : null;
+
+  const lastCue = lastRecord && lastRecord.coaching && lastRecord.coaching.headline
+    ? lastRecord.coaching.headline.cue || lastRecord.coaching.headline.title
+    : null;
+  const last = lastRecord
+    ? listRow(lastCue ? `Last time: ${lastCue}` : 'Your last swing', `${fmtDate(lastRecord.date)} · ${clubLabel(lastRecord.club)}`, null, () => onOpenLast(lastRecord.id))
+    : null;
+
+  const makeTip = () => tipCard(tipOfTheDay(settings.club, new Date(), tipOffset), () => {
+    tipOffset += 1;
+    const next = makeTip();
+    tip.replaceWith(next);
+    tip = next;
+  });
+  let tip = makeTip();
+
+  root.replaceChildren(
+    el('div', { class: 'stack' },
+      heroCard(greeting()),
+      start,
+      install,
+      last,
+      filmCard(),
+      tip));
 }

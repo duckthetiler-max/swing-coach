@@ -4,7 +4,7 @@
 // files never change between builds. Video is never touched: clips are gallery blobs, and
 // the dev server's /clips/ range requests pass straight through.
 // VERSION must match BUILD in src/app.js (a test checks it).
-const VERSION = '2026-09-17.5';
+const VERSION = '2026-09-27.6';
 const SHELL = `shell-${VERSION}`;
 const HEAVY = 'tracker-v1';
 const SHELL_FILES = [
@@ -33,6 +33,7 @@ const SHELL_FILES = [
   './src/pose-utils.js',
   './src/pose.js',
   './src/scale.js',
+  './src/simple.js',
   './src/store.js',
   './src/video.js',
   './src/ui/capture.js',
@@ -44,6 +45,7 @@ const SHELL_FILES = [
   './src/ui/processing.js',
   './src/ui/result.js',
   './src/ui/settings.js',
+  './src/ui/simple.js',
 ];
 
 self.addEventListener('install', (event) => {

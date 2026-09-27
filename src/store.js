@@ -15,16 +15,15 @@ export const DEFAULT_SETTINGS = Object.freeze({
   handed: 'right',
   model: 'full',
   factorDefault: 'auto',
-  protect: true,
   club: '7i',
   swingModel: 'neutral_rotary',
-  protectStage: 1,
   liveModel: 'lite',
   speakCue: false,
   coachHeadline: true,
   camera: 'environment',
   bag: DEFAULT_BAG,
   overlayStyle: 'markers',
+  simpleMode: true,
 });
 
 export const HANDED_OPTIONS = ['right', 'left'];
@@ -32,7 +31,6 @@ export const MODEL_OPTIONS = ['lite', 'full', 'heavy'];
 export const FACTOR_OPTIONS = [1, 2, 4, 8];
 export const CLUB_OPTIONS = CLUB_IDS;
 export const SWING_MODEL_OPTIONS = ['neutral_rotary', 'stack_and_tilt', 'one_plane', 'two_plane', 'classic', 'single_plane', 'a_swing', 'austin'];
-export const PROTECT_STAGES = [1, 2, 3, 4, 5];
 export const LIVE_MODEL_OPTIONS = ['lite', 'full'];
 export const CAMERA_OPTIONS = ['environment', 'user'];
 
@@ -53,8 +51,6 @@ export function normaliseSetting(key, value) {
       const n = Number(value);
       return FACTOR_OPTIONS.includes(n) ? n : undefined;
     }
-    case 'protect':
-      return typeof value === 'boolean' ? value : undefined;
     case 'club':
       return isClub(value) ? value : undefined;
     case 'bag':
@@ -63,14 +59,11 @@ export function normaliseSetting(key, value) {
       return value === 'markers' || value === 'figure' ? value : undefined;
     case 'swingModel':
       return SWING_MODEL_OPTIONS.includes(value) ? value : undefined;
-    case 'protectStage': {
-      const n = Number(value);
-      return PROTECT_STAGES.includes(n) ? n : undefined;
-    }
     case 'liveModel':
       return LIVE_MODEL_OPTIONS.includes(value) ? value : undefined;
     case 'speakCue':
     case 'coachHeadline':
+    case 'simpleMode':
       return typeof value === 'boolean' ? value : undefined;
     case 'camera':
       return CAMERA_OPTIONS.includes(value) ? value : undefined;
@@ -99,6 +92,37 @@ export function mergeSettings(current, patch) {
   return out;
 }
 
+/**
+ * Settings saved before Simple mode existed belong to someone already used to the full
+ * view, so they keep it. New installs (nothing saved) get the default, Simple mode on.
+ */
+export function upgradeStored(stored) {
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return stored;
+  if (Object.prototype.hasOwnProperty.call(stored, 'simpleMode')) return stored;
+  return { ...stored, simpleMode: false };
+}
+
+/**
+ * First launch of this build with nothing saved: is this a new golfer, or someone who used
+ * an older build without ever changing a setting? Saved swings, or a shell cache left by an
+ * older build, mean they were here before, so they keep the full view. Everyone else is
+ * new and gets Simple mode. Returns the settings to save.
+ * cacheKeys: names from CacheStorage; currentShell: this build's own shell cache name.
+ */
+export function firstRunPatch({ swingCount = 0, cacheKeys = [], currentShell = '' } = {}) {
+  // Only this app's own dated shell caches count. The origin is shared with every other
+  // project on duckthetiler-max.github.io, and the tracker cache is refilled by this build.
+  const oldCache = cacheKeys.some((k) => /^shell-\d{4}-\d{2}-\d{2}\.\d+$/.test(k) && k !== currentShell);
+  return { simpleMode: !(swingCount > 0 || oldCache) };
+}
+
+/** True when settings were saved on this device before. */
+export function hasStoredSettings() {
+  const ls = storage();
+  if (!ls) return false;
+  try { return ls.getItem(SETTINGS_KEY) !== null; } catch { return false; }
+}
+
 function storage() {
   try {
     return globalThis.localStorage || null;
@@ -118,7 +142,7 @@ export function getSettings() {
       parsed = null;
     }
   }
-  return mergeSettings(parsed, null);
+  return mergeSettings(upgradeStored(parsed), null);
 }
 
 export function saveSettings(patch) {

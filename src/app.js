@@ -6,7 +6,7 @@ import { detectView } from './angle.js';
 import { estimateScale } from './scale.js';
 import { computeMetrics, buildQuality } from './metrics.js';
 import { coach } from './coach.js';
-import { saveSwing, getSwing, deleteSwing, listSwings, getSettings, saveSettings } from './store.js';
+import { saveSwing, getSwing, deleteSwing, listSwings, getSettings, saveSettings, hasStoredSettings, firstRunPatch } from './store.js';
 import { composeStill, drawBody, drawGuides, drawCallouts } from './overlay.js';
 import { calloutsFor } from './markers.js';
 import { renderHome } from './ui/home.js';
@@ -21,7 +21,7 @@ import { openCamera, closeCamera, cameraSettings, LiveCapture, retrackPictures, 
 import { buildLiveClip } from './live.js';
 import { renderCapture, paintLive, refreshLiveCounters } from './ui/capture.js';
 
-export const BUILD = '2026-09-17.5';
+export const BUILD = '2026-09-27.6';
 
 const root = document.getElementById('app');
 const state = {
@@ -104,7 +104,7 @@ async function route() {
       break;
     case 'history':
       setChrome({ title: 'History', tab: 'history' });
-      await renderHistory(root, { onOpen: (id) => nav(`#result/${id}`) });
+      await renderHistory(root, { onOpen: (id) => nav(`#result/${id}`), simple: state.settings.simpleMode });
       break;
     case 'settings':
       setChrome({ title: 'Settings', tab: 'settings' });
@@ -465,7 +465,8 @@ async function analyze(src) {
       fps, maxSamples: 360, signal: abort.signal,
       onProgress: (pct, label) => updateProgress({ pct, label }),
     });
-    await finishAnalysis({ video, clip, club: s.club, viewChoice: state.viewChoice, demo: false });
+    // Simple mode hides the angle picker, so it always reads the angle from the swing.
+    await finishAnalysis({ video, clip, club: s.club, viewChoice: s.simpleMode ? 'auto' : state.viewChoice, demo: false });
   } catch (err) {
     if (err && err.name === 'AbortError') { if (video) releaseVideo(video); nav('#home'); return; }
     console.error(err);
@@ -519,7 +520,7 @@ function recomputeFor(c) {
     view: angle.view, handed: s.handed, model: s.swingModel, events: c.events, angle, scale, factor: c.factor,
     fpsReal: (c.clip.fps * c.factor) / c.clip.stride, metrics, quality,
   };
-  c.coaching = coach(c.analysis, { club: c.club, protect: s.protect, handed: s.handed, model: s.swingModel });
+  c.coaching = coach(c.analysis, { club: c.club, protect: false, handed: s.handed, model: s.swingModel });
 }
 
 const STILL_OPTS = { accent: '#30d158', ink: '#ffffff' };
@@ -595,7 +596,7 @@ function buildRecord(note) {
 function buildRecordFor(c, note) {
   const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `s-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   return {
-    id, date: new Date().toISOString(), club: c.club, view: c.analysis.view, protect: state.settings.protect,
+    id, date: new Date().toISOString(), club: c.club, view: c.analysis.view,
     analysis: stripAnalysis(c.analysis), coaching: c.coaching, stills: c.stills, note: note || '',
   };
 }
@@ -677,7 +678,22 @@ function showDevScreen(which) {
   return false;
 }
 
+/**
+ * Nothing saved yet: decide once whether this is a new golfer or a returning one, before
+ * anything is shown, and save it so the answer never changes. Runs before the service
+ * worker registers, so this build's own caches cannot be mistaken for an older build's.
+ */
+async function settleFirstRun() {
+  if (hasStoredSettings()) return;
+  let swingCount = 0;
+  let cacheKeys = [];
+  try { swingCount = (await listSwings()).length; } catch { /* no database: nothing saved */ }
+  try { if (globalThis.caches) cacheKeys = await caches.keys(); } catch { /* no cache storage */ }
+  state.settings = saveSettings(firstRunPatch({ swingCount, cacheKeys, currentShell: `shell-${BUILD}` }));
+}
+
 async function start() {
+  await settleFirstRun();
   const params = new URLSearchParams(location.search);
   if (params.get('club')) state.settings = saveSettings({ club: params.get('club') });
   registerWorker();

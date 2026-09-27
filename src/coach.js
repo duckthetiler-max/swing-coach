@@ -23,6 +23,8 @@ export const MIN_HEADLINE_CONFIDENCE = 0.5;
 export const UNCLEAR_LINE = 'Not clear enough to coach: within its band of doubt of the green range, or tracked with low confidence.';
 export const NOTHING_CLEAR = 'Nothing was clearly outside its band once the doubt is counted.';
 export const UNVALIDATED_LINE = 'Not yet validated on real footage. Check the picture agrees before you act on this.';
+/** Title of the fallback headline when nothing is clearly worth coaching. */
+export const KEEP_TEMPO_TITLE = 'Keep your tempo';
 
 /**
  * The headline rule. A number is coached only when the tracker was sure enough of it AND the
@@ -491,7 +493,7 @@ function tempoHeadline(ctx, whatLine) {
   const card = drillCard('tempo', ctx.handed);
   return {
     metricId: 'tempo',
-    title: 'Keep your tempo',
+    title: KEEP_TEMPO_TITLE,
     what,
     why: 'With nothing to fix, the useful signal is tempo. Tour players repeat their own ratio; the same rhythm every swing matters more than the number itself.',
     cue: card.cue,
