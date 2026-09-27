@@ -172,9 +172,10 @@ test('Simple mode is on for new installs and off for settings saved before it ex
   assert.equal(mergeSettings({ simpleMode: true }, { simpleMode: 'yes' }).simpleMode, true, 'a bad value keeps the current one');
 });
 
-test('PROTECT is off for new installs and kept as it was for saved settings', () => {
-  assert.equal(DEFAULT_SETTINGS.protect, false);
-  assert.equal(mergeSettings(upgradeStored(null), null).protect, false);
+test('PROTECT falls back to on, and only a first launch turns it off for a new golfer', () => {
+  assert.equal(DEFAULT_SETTINGS.protect, true, 'lost or corrupt settings keep PROTECT on');
+  assert.equal(mergeSettings(upgradeStored(null), null).protect, true);
+  assert.equal(mergeSettings(null, firstRunPatch({ swingCount: 0 })).protect, false, 'a new golfer, decided on first launch');
   assert.equal(mergeSettings(upgradeStored({ handed: 'left' }), null).protect, true, 'saved before the change: the old default, on');
   assert.equal(mergeSettings(upgradeStored({ protect: true, simpleMode: true }), null).protect, true);
   assert.equal(mergeSettings(upgradeStored({ protect: false }), null).protect, false);
@@ -246,7 +247,7 @@ test('every why is hedged the way the coach hedges', () => {
     for (const value of [-20, 0.5, 20, 200]) {
       const { why } = plainFault({ id, value, band: 'red', confidence: 1 }, { club: '7i' });
       const first = why.split(/[.,]/)[0];
-      assert.match(first, /\b(often|can|tends?|may|could|called|Good players|hard to hold|more slide than turn|Setting|Too much|Some|A steady)\b/, `${id} at ${value}: "${first}"`);
+      assert.match(first, /\b(often|can|tends?|may|could|called|Good players|hard to hold|more slide than turn|Too much|Some|A steady)\b/, `${id} at ${value}: "${first}"`);
     }
   }
 });
@@ -257,6 +258,7 @@ test('first launch with nothing saved: returning golfers keep the full view and 
   assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: [shell], currentShell: shell }), { simpleMode: true, protect: false }, 'this build\'s own cache is not a sign of an old visit');
   assert.deepEqual(firstRunPatch({ swingCount: 3, cacheKeys: [], currentShell: shell }), { simpleMode: false, protect: true }, 'saved swings');
   assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: ['shell-2026-09-17.5'], currentShell: shell }), { simpleMode: false, protect: true }, 'an older build\'s cache');
-  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: ['tracker-v1'], currentShell: shell }), { simpleMode: false, protect: true }, 'the tracker was downloaded before');
+  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: ['tracker-v1'], currentShell: shell }), { simpleMode: true, protect: false }, 'this build refills the tracker cache itself');
+  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: ['shell-v3', 'shell-other-app'], currentShell: shell }), { simpleMode: true, protect: false }, 'another app on the same origin');
   assert.deepEqual(firstRunPatch(), { simpleMode: true, protect: false });
 });

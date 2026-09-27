@@ -221,7 +221,7 @@ export function plainFault(m, { handed = 'right', club = null, model = null } = 
       if (side === 'high') return { what: `Your ${trail} shoulder is set very low at the start.`, why: 'Too much tilt can make you sway and hit the ground first.' };
       return {
         what: v < 0 ? `Your ${lead} shoulder is lower than your ${trail} shoulder at the start.` : 'Your shoulders are nearly level at the start.',
-        why: `Setting your ${trail} shoulder a little lower makes it easier to turn behind the ball.`,
+        why: `Setting your ${trail} shoulder a little lower tends to make it easier to turn behind the ball.`,
       };
     case 'leadArmTop':
       return { what: `Your ${lead} arm bends a lot at the top of your swing.`, why: 'That often changes the length of your swing, so contact can vary. A shorter, smoother backswing can help.' };

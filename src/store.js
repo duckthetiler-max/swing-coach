@@ -15,7 +15,9 @@ export const DEFAULT_SETTINGS = Object.freeze({
   handed: 'right',
   model: 'full',
   factorDefault: 'auto',
-  protect: false,
+  // On unless a first launch decides otherwise (firstRunPatch): lost or unreadable settings
+  // must never switch the lead-arm protection off.
+  protect: true,
   club: '7i',
   swingModel: 'neutral_rotary',
   protectStage: 1,
@@ -115,13 +117,16 @@ export function upgradeStored(stored) {
 
 /**
  * First launch of this build with nothing saved: is this a new golfer, or someone who used
- * an older build without ever changing a setting (or whose storage was cleared)? Saved
- * swings, or caches left by an older build, mean they were here before, so they keep what
- * the old build gave them: the full view and PROTECT on. Returns the settings to save.
+ * an older build without ever changing a setting? Saved swings, or a shell cache left by an
+ * older build, mean they were here before, so they keep what the old build gave them: the
+ * full view and PROTECT on. Everyone else is new: Simple mode, PROTECT off, saved
+ * explicitly so the safe defaults (PROTECT on) apply only when settings are lost.
  * cacheKeys: names from CacheStorage; currentShell: this build's own shell cache name.
  */
 export function firstRunPatch({ swingCount = 0, cacheKeys = [], currentShell = '' } = {}) {
-  const oldCache = cacheKeys.some((k) => k === 'tracker-v1' || (k.startsWith('shell-') && k !== currentShell));
+  // Only this app's own dated shell caches count. The origin is shared with every other
+  // project on duckthetiler-max.github.io, and the tracker cache is refilled by this build.
+  const oldCache = cacheKeys.some((k) => /^shell-\d{4}-\d{2}-\d{2}\.\d+$/.test(k) && k !== currentShell);
   return swingCount > 0 || oldCache ? { simpleMode: false, protect: true } : { simpleMode: true, protect: false };
 }
 
