@@ -108,7 +108,7 @@ export const NORMS = {
     label: 'Lead arm at top', unit: 'deg', view: 'fo', tier: 'B', uncertainty: { abs: 6 },
     direction: '180 = straight',
     bands: [g(165, 180), a(150, 165)],
-    description: 'Lead elbow angle at the top. Green is 165 to 180 deg. Red is under 150. No measured tour band exists; this is a straightness check. In PROTECT mode it is reported, not coached.',
+    description: 'Lead elbow angle at the top. Green is 165 to 180 deg. Red is under 150. No measured tour band exists; this is a straightness check.',
     sources: ['tpi_characteristics', 'skillest_stack_tilt'],
     byModel: {
       stack_and_tilt: [g(170, 180), a(155, 170)],

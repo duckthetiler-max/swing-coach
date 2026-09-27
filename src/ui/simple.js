@@ -1,7 +1,7 @@
 // Simple mode building blocks: the friendly pieces a new golfer sees first. Browser only.
 // The words come from ../simple.js; this file only lays them out.
 import { el, svg, button } from './dom.js';
-import { FILM_STEPS, PROTECT_LINE, EARLY_DAYS_LINE } from '../simple.js';
+import { FILM_STEPS, EARLY_DAYS_LINE } from '../simple.js';
 
 const stroke = { fill: 'none', stroke: 'currentColor', 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true' };
 
@@ -60,10 +60,6 @@ export function tipCard(tip, onNext) {
 export function statusPill(status, word) {
   const make = STATUS_ICON[status] || ICONS.check;
   return el('span', { class: `status ${status}` }, make(), word);
-}
-
-function notice(text) {
-  return el('div', { class: 'card notice' }, ICONS.alert(), el('p', {}, text));
 }
 
 function oneThingCard(model, { unvalidated }) {
@@ -135,7 +131,6 @@ export function simpleResultView(model, opts = {}) {
   const warnings = Array.isArray(opts.warnings) ? opts.warnings.filter(Boolean) : [];
   return [
     el('div', { class: 'meta-line' }, opts.meta || model.viewLabel),
-    model.protect ? notice(PROTECT_LINE) : null,
     model.askView && opts.onPickView ? askViewCard(opts.onPickView) : null,
     oneThingCard(model, { unvalidated: !!opts.unvalidated }),
     warnings.length && model.state !== 'unseen' ? clipCard(warnings) : null,

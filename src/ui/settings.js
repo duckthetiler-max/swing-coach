@@ -1,7 +1,7 @@
 // Settings screen.
 import { el, field, select, switchRow, segmented, button, listRow } from './dom.js';
 import { renderHowto } from './howto.js';
-import { SWING_MODELS, PROTECT } from '../knowledge.js';
+import { SWING_MODELS } from '../knowledge.js';
 import { CLUB_LIST, GROUPS, normaliseBag } from '../clubs.js';
 
 export function renderSettings(root, ctx) {
@@ -12,7 +12,6 @@ export function renderSettings(root, ctx) {
 
   const modelOptions = Object.entries(SWING_MODELS).map(([id, m]) => [id, m.name]);
   const model = SWING_MODELS[settings.swingModel] || SWING_MODELS.neutral_rotary;
-  const stage = PROTECT.stages.find((s) => s.n === settings.protectStage) || PROTECT.stages[0];
 
   const simple = settings.simpleMode === true;
   const simpleCard = el('div', { class: 'card' },
@@ -58,23 +57,6 @@ export function renderSettings(root, ctx) {
           settings.coachHeadline
             ? 'On. One headline, only when a number is clearly outside its band once the doubt is counted, and marked as not yet validated.'
             : 'Off. Numbers and pictures only. The stricter choice until your own footage has validated the measurements.')),
-
-      el('div', { class: 'card stack' },
-        el('div', {}, el('div', { class: 'eyebrow' }, 'Lead arm'), el('h2', {}, 'PROTECT mode')),
-        switchRow('PROTECT mode', settings.protect, (v) => onSave({ protect: v }),
-          settings.protect ? 'On. Volume and shot order are managed, no speed drills, a bent lead arm is reported but not coached.' : 'Off. Full coaching, including the lead arm.'),
-        el('p', { class: 'small muted' }, PROTECT.disclaimer),
-        field('Return-to-golf stage', select(PROTECT.stages.map((s) => [String(s.n), `Stage ${s.n}: ${s.name}`]), String(settings.protectStage), (v) => onSave({ protectStage: Number(v) })),
-          PROTECT.stageRule),
-        el('div', { class: 'metric' },
-          el('div', { class: 'metric-label' }, `Stage ${stage.n}: ${stage.name}`),
-          el('ol', {}, stage.sessions.map((s, i) => el('li', {}, `Session ${'ABC'[i]}: ${s}`)))),
-        el('details', {}, el('summary', {}, 'What PROTECT mode says'),
-          el('ul', {}, ['on', 'stop', 'warmUp', 'volume', 'order', 'surface', 'followThrough', 'morning', 'work', 'progress', 'off'].map((k) => el('li', { class: 'small' }, PROTECT.lines[k])))),
-        el('details', {}, el('summary', {}, 'Red flags: get it looked at'),
-          el('ul', {}, PROTECT.redFlags.map((s) => el('li', {}, s))),
-          el('p', { class: 'small muted' }, PROTECT.redFlagFooter)),
-        el('p', { class: 'small' }, PROTECT.lines.off)),
 
       renderHowto(true),
 

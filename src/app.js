@@ -21,7 +21,7 @@ import { openCamera, closeCamera, cameraSettings, LiveCapture, retrackPictures, 
 import { buildLiveClip } from './live.js';
 import { renderCapture, paintLive, refreshLiveCounters } from './ui/capture.js';
 
-export const BUILD = '2026-09-27.5';
+export const BUILD = '2026-09-27.6';
 
 const root = document.getElementById('app');
 const state = {
@@ -520,7 +520,7 @@ function recomputeFor(c) {
     view: angle.view, handed: s.handed, model: s.swingModel, events: c.events, angle, scale, factor: c.factor,
     fpsReal: (c.clip.fps * c.factor) / c.clip.stride, metrics, quality,
   };
-  c.coaching = coach(c.analysis, { club: c.club, protect: s.protect, handed: s.handed, model: s.swingModel });
+  c.coaching = coach(c.analysis, { club: c.club, protect: false, handed: s.handed, model: s.swingModel });
 }
 
 const STILL_OPTS = { accent: '#30d158', ink: '#ffffff' };
@@ -596,7 +596,7 @@ function buildRecord(note) {
 function buildRecordFor(c, note) {
   const id = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `s-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
   return {
-    id, date: new Date().toISOString(), club: c.club, view: c.analysis.view, protect: state.settings.protect,
+    id, date: new Date().toISOString(), club: c.club, view: c.analysis.view,
     analysis: stripAnalysis(c.analysis), coaching: c.coaching, stills: c.stills, note: note || '',
   };
 }

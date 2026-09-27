@@ -18,7 +18,7 @@ import {
   UNCLEAR_WHAT, PROTECTED_WHAT, keepReason,
 } from '../src/simple.js';
 
-function analyse(knobs, { handed = 'right', club = '7i', protect = true } = {}) {
+function analyse(knobs, { handed = 'right', club = '7i', protect = false } = {}) {
   const clip = synthSwing(knobs);
   const events = findEvents(clip);
   const angle = detectView(clip, events, handed);
@@ -75,12 +75,11 @@ test('face-on demo: nothing clearly off, so the one thing is rhythm', () => {
   assert.equal(r.viewLabel, 'Filmed from the front');
 });
 
-test('PROTECT mode leaves the lead arm out of the glance', () => {
+test('swings saved with the old PROTECT mode leave the lead arm out of the glance', () => {
   const on = analyse(FO_DEMO, { protect: true });
   const off = analyse(FO_DEMO, { protect: false });
   assert.ok(!glance(on.analysis, on.coaching).some((a) => a.id === 'arms'));
   assert.equal(glance(off.analysis, off.coaching).find((a) => a.id === 'arms').status, 'good');
-  assert.equal(simpleResult(on.analysis, on.coaching).protect, true);
 });
 
 test('coach switched off: no area is singled out and there is no drill', () => {
@@ -172,13 +171,10 @@ test('Simple mode is on for new installs and off for settings saved before it ex
   assert.equal(mergeSettings({ simpleMode: true }, { simpleMode: 'yes' }).simpleMode, true, 'a bad value keeps the current one');
 });
 
-test('PROTECT falls back to on, and only a first launch turns it off for a new golfer', () => {
-  assert.equal(DEFAULT_SETTINGS.protect, true, 'lost or corrupt settings keep PROTECT on');
-  assert.equal(mergeSettings(upgradeStored(null), null).protect, true);
-  assert.equal(mergeSettings(null, firstRunPatch({ swingCount: 0 })).protect, false, 'a new golfer, decided on first launch');
-  assert.equal(mergeSettings(upgradeStored({ handed: 'left' }), null).protect, true, 'saved before the change: the old default, on');
-  assert.equal(mergeSettings(upgradeStored({ protect: true, simpleMode: true }), null).protect, true);
-  assert.equal(mergeSettings(upgradeStored({ protect: false }), null).protect, false);
+test('PROTECT mode is gone from settings', () => {
+  assert.equal('protect' in DEFAULT_SETTINGS, false);
+  assert.equal('protectStage' in DEFAULT_SETTINGS, false);
+  assert.equal('protect' in mergeSettings({ protect: true, protectStage: 3 }, null), false, 'old saved values are dropped');
 });
 
 // ---------- council round 1 findings ----------
@@ -191,14 +187,14 @@ test('a clean swing (every reading green) is the only one called clearly fine', 
   assert.equal(simpleResult(clean, c).what, KEEP_WHAT);
 });
 
-test('PROTECT with a bent lead arm says it is reported, not that the swing is fine', () => {
+test('an old PROTECT swing with a bent lead arm says it was reported, not that the swing is fine', () => {
   const { analysis } = analyse(FO_DEMO, { protect: true });
   const bent = { ...analysis, metrics: analysis.metrics.map((m) => (m.id === 'leadArmImpact' ? { ...m, value: 120, band: 'red' } : m)) };
   const c = coach(bent, { club: '7i', protect: true });
   assert.equal(c.headline.title, KEEP_TEMPO_TITLE);
   const r = simpleResult(bent, c, { handed: 'right' });
   assert.equal(r.what, PROTECTED_WHAT);
-  assert.match(r.why, /left arm is reported, not coached/);
+  assert.match(r.why, /left arm was reported, not coached/);
   assert.equal(simpleResult(bent, c, { handed: 'left' }).why.includes('right arm'), true);
 });
 
@@ -252,13 +248,13 @@ test('every why is hedged the way the coach hedges', () => {
   }
 });
 
-test('first launch with nothing saved: returning golfers keep the full view and PROTECT', () => {
+test('first launch with nothing saved: returning golfers keep the full view', () => {
   const shell = 'shell-2026-09-27.4';
-  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: [], currentShell: shell }), { simpleMode: true, protect: false });
-  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: [shell], currentShell: shell }), { simpleMode: true, protect: false }, 'this build\'s own cache is not a sign of an old visit');
-  assert.deepEqual(firstRunPatch({ swingCount: 3, cacheKeys: [], currentShell: shell }), { simpleMode: false, protect: true }, 'saved swings');
-  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: ['shell-2026-09-17.5'], currentShell: shell }), { simpleMode: false, protect: true }, 'an older build\'s cache');
-  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: ['tracker-v1'], currentShell: shell }), { simpleMode: true, protect: false }, 'this build refills the tracker cache itself');
-  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: ['shell-v3', 'shell-other-app'], currentShell: shell }), { simpleMode: true, protect: false }, 'another app on the same origin');
-  assert.deepEqual(firstRunPatch(), { simpleMode: true, protect: false });
+  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: [], currentShell: shell }), { simpleMode: true });
+  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: [shell], currentShell: shell }), { simpleMode: true }, 'this build\'s own cache is not a sign of an old visit');
+  assert.deepEqual(firstRunPatch({ swingCount: 3, cacheKeys: [], currentShell: shell }), { simpleMode: false }, 'saved swings');
+  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: ['shell-2026-09-17.5'], currentShell: shell }), { simpleMode: false }, 'an older build\'s cache');
+  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: ['tracker-v1'], currentShell: shell }), { simpleMode: true }, 'this build refills the tracker cache itself');
+  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: ['shell-v3', 'shell-other-app'], currentShell: shell }), { simpleMode: true }, 'another app on the same origin');
+  assert.deepEqual(firstRunPatch(), { simpleMode: true });
 });

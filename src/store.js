@@ -15,12 +15,8 @@ export const DEFAULT_SETTINGS = Object.freeze({
   handed: 'right',
   model: 'full',
   factorDefault: 'auto',
-  // On unless a first launch decides otherwise (firstRunPatch): lost or unreadable settings
-  // must never switch the lead-arm protection off.
-  protect: true,
   club: '7i',
   swingModel: 'neutral_rotary',
-  protectStage: 1,
   liveModel: 'lite',
   speakCue: false,
   coachHeadline: true,
@@ -35,7 +31,6 @@ export const MODEL_OPTIONS = ['lite', 'full', 'heavy'];
 export const FACTOR_OPTIONS = [1, 2, 4, 8];
 export const CLUB_OPTIONS = CLUB_IDS;
 export const SWING_MODEL_OPTIONS = ['neutral_rotary', 'stack_and_tilt', 'one_plane', 'two_plane', 'classic', 'single_plane', 'a_swing', 'austin'];
-export const PROTECT_STAGES = [1, 2, 3, 4, 5];
 export const LIVE_MODEL_OPTIONS = ['lite', 'full'];
 export const CAMERA_OPTIONS = ['environment', 'user'];
 
@@ -56,8 +51,6 @@ export function normaliseSetting(key, value) {
       const n = Number(value);
       return FACTOR_OPTIONS.includes(n) ? n : undefined;
     }
-    case 'protect':
-      return typeof value === 'boolean' ? value : undefined;
     case 'club':
       return isClub(value) ? value : undefined;
     case 'bag':
@@ -66,10 +59,6 @@ export function normaliseSetting(key, value) {
       return value === 'markers' || value === 'figure' ? value : undefined;
     case 'swingModel':
       return SWING_MODEL_OPTIONS.includes(value) ? value : undefined;
-    case 'protectStage': {
-      const n = Number(value);
-      return PROTECT_STAGES.includes(n) ? n : undefined;
-    }
     case 'liveModel':
       return LIVE_MODEL_OPTIONS.includes(value) ? value : undefined;
     case 'speakCue':
@@ -105,29 +94,26 @@ export function mergeSettings(current, patch) {
 
 /**
  * Settings saved before Simple mode existed belong to someone already used to the full
- * view, so they keep it. New installs (nothing saved) get the defaults: Simple mode on,
- * PROTECT off. Saved settings keep PROTECT as they had it, on if it was never stored.
+ * view, so they keep it. New installs (nothing saved) get the default, Simple mode on.
  */
 export function upgradeStored(stored) {
   if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return stored;
-  const has = (key) => Object.prototype.hasOwnProperty.call(stored, key);
-  if (has('simpleMode') && has('protect')) return stored;
-  return { ...stored, ...(has('simpleMode') ? {} : { simpleMode: false }), ...(has('protect') ? {} : { protect: true }) };
+  if (Object.prototype.hasOwnProperty.call(stored, 'simpleMode')) return stored;
+  return { ...stored, simpleMode: false };
 }
 
 /**
  * First launch of this build with nothing saved: is this a new golfer, or someone who used
  * an older build without ever changing a setting? Saved swings, or a shell cache left by an
- * older build, mean they were here before, so they keep what the old build gave them: the
- * full view and PROTECT on. Everyone else is new: Simple mode, PROTECT off, saved
- * explicitly so the safe defaults (PROTECT on) apply only when settings are lost.
+ * older build, mean they were here before, so they keep the full view. Everyone else is
+ * new and gets Simple mode. Returns the settings to save.
  * cacheKeys: names from CacheStorage; currentShell: this build's own shell cache name.
  */
 export function firstRunPatch({ swingCount = 0, cacheKeys = [], currentShell = '' } = {}) {
   // Only this app's own dated shell caches count. The origin is shared with every other
   // project on duckthetiler-max.github.io, and the tracker cache is refilled by this build.
   const oldCache = cacheKeys.some((k) => /^shell-\d{4}-\d{2}-\d{2}\.\d+$/.test(k) && k !== currentShell);
-  return swingCount > 0 || oldCache ? { simpleMode: false, protect: true } : { simpleMode: true, protect: false };
+  return { simpleMode: !(swingCount > 0 || oldCache) };
 }
 
 /** True when settings were saved on this device before. */

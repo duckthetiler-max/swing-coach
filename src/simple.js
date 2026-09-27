@@ -42,7 +42,8 @@ export const AREAS = Object.freeze([
 /** Never in the glance: timing information, clip quality, and the two turn angles. */
 export const NOT_IN_GLANCE = Object.freeze(['backswingTime', 'downswingTime', 'downswingFrames', 'visibility', 'shoulderTurn', 'hipTurn']);
 
-// In PROTECT mode a bent lead arm is reported, never coached, so the glance leaves it out.
+// Swings saved while the old PROTECT mode was on reported a bent lead arm but never coached
+// it, so the glance leaves those readings out for them.
 const PROTECTED_IDS = new Set(['leadArmTop', 'leadArmImpact']);
 
 export const STATUS_WORDS = Object.freeze({ good: 'Good', look: 'Worth a look', work: 'Work on this' });
@@ -243,10 +244,9 @@ export const KEEP_WHY = 'So your one thing is rhythm: keep the same count on eve
 export const UNCLEAR_WHAT = 'Nothing was clear enough to single out this time.';
 export const UNCLEAR_WHY = 'Some readings were close to the line or hard to see, so your one thing is rhythm: keep the same count on every ball. The rest is under "Show me the details".';
 export const PROTECTED_WHAT = 'Nothing we coach was clearly off.';
-const protectedWhy = (lead) => `Your ${lead} arm is reported, not coached, while PROTECT mode is on. So your one thing is rhythm: keep the same count on every ball.`;
+const protectedWhy = (lead) => `This swing was saved with PROTECT mode on, so your ${lead} arm was reported, not coached. Your one thing is rhythm: keep the same count on every ball.`;
 export const UNSEEN_WHAT = 'We could not see enough of your body to coach this swing.';
 export const UNSEEN_WHY = 'Film it again with your whole body and the club in the picture.';
-export const PROTECT_LINE = 'PROTECT mode is on: gentle drills only. Stop straight away if your arm hurts.';
 export const EARLY_DAYS_LINE = 'Early days: these readings are not yet checked against real footage. If the pictures disagree, trust the pictures.';
 
 /**
@@ -303,7 +303,6 @@ export function simpleResult(analysis, coaching, { handed = 'right', club = null
     nice: nice.length || state === 'unseen' ? nice : [{ areaId: null, line: NICE_FALLBACK }],
     areas,
     askView: analysis.view === 'unknown',
-    protect: !!(coaching && coaching.protect),
     viewLabel: simpleViewLabel(analysis.view),
   };
 }

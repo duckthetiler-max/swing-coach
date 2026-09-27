@@ -17,7 +17,6 @@ let openDetailsFor = null;
 export function renderResult(root, ctx) {
   const { mode, analysis, coaching, stills, club, settings, actions, record, live } = ctx;
   const view = analysis.view;
-  const protect = coaching.protect;
 
   const header = el('div', {},
     el('div', { class: 'eyebrow' }, `${clubLabel(club)}, ${viewLabel(view)}${record ? `, ${fmtDate(record.date)}` : ''}`),
@@ -26,10 +25,6 @@ export function renderResult(root, ctx) {
       el('span', { class: 'field-label' }, 'Camera angle'),
       segmented(ANGLE_OPTIONS, live.viewOverride, (v) => actions.setView(v), 'Camera angle'),
       el('p', { class: 'muted hint small' }, `Auto read this clip as ${viewLabel(live.angleAuto.view).toLowerCase()} (ratio ${live.angleAuto.ratio === null ? 'n/a' : live.angleAuto.ratio.toFixed(2)}).`)) : null);
-
-  const protectCard = protect
-    ? el('div', { class: 'card warn flat' }, el('strong', {}, 'PROTECT mode is on. '), 'No speed drills. Stop straight away if the lead arm hurts.')
-    : null;
 
   const h = coaching.headline;
   const card = h && h.drillCard;
@@ -105,7 +100,7 @@ export function renderResult(root, ctx) {
     ? el('div', { class: 'actionbar' }, button(anotherLabel, () => actions.another(), 'btn'), saveBtn)
     : el('div', { class: 'actionbar' }, button('Delete', () => actions.remove(), 'btn danger'), button('Back to history', () => actions.back(), 'btn'));
 
-  const full = [header, protectCard, headline, warnings, report, stillsCard, scrub, noteCard];
+  const full = [header, headline, warnings, report, stillsCard, scrub, noteCard];
   if (!simple) {
     root.replaceChildren(el('div', { class: 'stack' }, ...full, actionbar));
     return;

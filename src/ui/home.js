@@ -1,9 +1,9 @@
 // Home screen: pick a clip, choose the club and angle, today's plan, setup for the club.
 // Simple mode: a welcome, the club, one big button, how to film, and a tip of the day.
-import { el, button, segmented, switchRow, listRow, clubStrip, ANGLE_OPTIONS, clubLabel, viewLabel, fmtDate } from './dom.js';
+import { el, button, segmented, listRow, clubStrip, ANGLE_OPTIONS, clubLabel, viewLabel, fmtDate } from './dom.js';
 import { clubsToOffer, clubGroup } from '../clubs.js';
 import { renderHowto } from './howto.js';
-import { PROTECT, PRACTICE, SETUP_BY_CLUB } from '../knowledge.js';
+import { PRACTICE, SETUP_BY_CLUB } from '../knowledge.js';
 import { setupBlock } from './knowledge.js';
 import { tipOfTheDay, greeting } from '../simple.js';
 import { heroCard, filmCard, tipCard } from './simple.js';
@@ -39,10 +39,6 @@ export function renderHome(root, ctx) {
     el('div', { class: 'row', style: { justifyContent: 'center' } }, button('Record one clip with the camera app', () => camInput.click(), 'btn link')),
     fileInput, camInput);
 
-  const protectRow = el('div', { class: 'card', style: { paddingTop: '6px', paddingBottom: '6px' } },
-    switchRow('PROTECT mode', settings.protect, (v) => onSetting({ protect: v }),
-      settings.protect ? 'On. No speed drills. Stop if the lead arm hurts.' : 'Off. Full coaching, including the lead arm.'));
-
   const install = app && app.canInstall
     ? el('div', { class: 'banner' },
       el('div', { class: 'text' }, el('div', { style: { fontWeight: 600 } }, 'Put it on your home screen'), el('div', { class: 'small muted' }, 'Opens full screen like an app and works offline at the range.')),
@@ -57,9 +53,8 @@ export function renderHome(root, ctx) {
   root.replaceChildren(
     el('div', { class: 'stack' },
       hero,
-      protectRow,
       install,
-      sessionPlan(settings),
+      sessionPlan(),
       last,
       el('details', { class: 'card' }, el('summary', {}, `Setting up with the ${clubLabel(settings.club).toLowerCase()}`),
         setupBlock(SETUP_BY_CLUB[clubGroup(settings.club)] || SETUP_BY_CLUB.midIron)),
@@ -67,21 +62,7 @@ export function renderHome(root, ctx) {
       listRow('Where the numbers come from', 'Every band, its tier and its sources.', null, onKnowledge)));
 }
 
-function sessionPlan(settings) {
-  if (settings.protect) {
-    const stage = PROTECT.stages.find((s) => s.n === settings.protectStage) || PROTECT.stages[0];
-    return el('div', { class: 'card warn stack' },
-      el('div', {}, el('div', { class: 'eyebrow' }, "Today's plan"), el('h2', {}, `Stage ${stage.n}, ${stage.name.toLowerCase()}`)),
-      el('p', { class: 'what', style: { fontWeight: 600 } }, PROTECT.lines.stop),
-      el('ol', {}, stage.sessions.map((s, i) => el('li', {}, `Session ${'ABC'[i]}: ${s}`))),
-      el('p', { class: 'small' }, 'Pick the session you have not done this week. Every other day, three a week.'),
-      el('p', { class: 'small muted' }, PROTECT.lines.warmUp),
-      el('p', { class: 'small muted' }, PROTECT.lines.surface),
-      el('details', {}, el('summary', {}, 'Red flags'),
-        el('ul', {}, PROTECT.redFlags.map((f) => el('li', {}, f))),
-        el('p', { class: 'small muted' }, PROTECT.redFlagFooter)),
-      el('p', { class: 'small muted' }, 'Change the stage in Settings when you finish one cleanly.'));
-  }
+function sessionPlan() {
   return el('details', { class: 'card' }, el('summary', {}, 'A range session that sticks'),
     el('ol', {}, PRACTICE.session.map((b) => el('li', {}, el('strong', {}, `${b.name}. `), b.detail))),
     el('p', { class: 'small muted' }, `${PRACTICE.videoNote} ${PRACTICE.frequency}`));
