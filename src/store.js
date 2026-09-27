@@ -113,6 +113,25 @@ export function upgradeStored(stored) {
   return { ...stored, ...(has('simpleMode') ? {} : { simpleMode: false }), ...(has('protect') ? {} : { protect: true }) };
 }
 
+/**
+ * First launch of this build with nothing saved: is this a new golfer, or someone who used
+ * an older build without ever changing a setting (or whose storage was cleared)? Saved
+ * swings, or caches left by an older build, mean they were here before, so they keep what
+ * the old build gave them: the full view and PROTECT on. Returns the settings to save.
+ * cacheKeys: names from CacheStorage; currentShell: this build's own shell cache name.
+ */
+export function firstRunPatch({ swingCount = 0, cacheKeys = [], currentShell = '' } = {}) {
+  const oldCache = cacheKeys.some((k) => k === 'tracker-v1' || (k.startsWith('shell-') && k !== currentShell));
+  return swingCount > 0 || oldCache ? { simpleMode: false, protect: true } : { simpleMode: true, protect: false };
+}
+
+/** True when settings were saved on this device before. */
+export function hasStoredSettings() {
+  const ls = storage();
+  if (!ls) return false;
+  try { return ls.getItem(SETTINGS_KEY) !== null; } catch { return false; }
+}
+
 function storage() {
   try {
     return globalThis.localStorage || null;

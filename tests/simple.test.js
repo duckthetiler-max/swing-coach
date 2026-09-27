@@ -11,10 +11,11 @@ import { computeMetrics, buildQuality } from '../src/metrics.js';
 import { coach, KEEP_TEMPO_TITLE } from '../src/coach.js';
 import { ALL_METRIC_IDS } from '../src/norms.js';
 import { CLUB_IDS } from '../src/clubs.js';
-import { mergeSettings, upgradeStored, DEFAULT_SETTINGS } from '../src/store.js';
+import { mergeSettings, upgradeStored, DEFAULT_SETTINGS, firstRunPatch } from '../src/store.js';
 import {
   AREAS, NOT_IN_GLANCE, glance, niceWork, plainFault, simpleResult, isRealFault,
   tipsFor, tipOfTheDay, simpleViewLabel, NICE_FALLBACK, KEEP_WHAT, UNSEEN_WHAT,
+  UNCLEAR_WHAT, PROTECTED_WHAT, keepReason,
 } from '../src/simple.js';
 
 function analyse(knobs, { handed = 'right', club = '7i', protect = true } = {}) {
@@ -65,7 +66,9 @@ test('face-on demo: nothing clearly off, so the one thing is rhythm', () => {
   assert.equal(isRealFault(coaching), false);
   const r = simpleResult(analysis, coaching, { club: '7i' });
   assert.equal(r.state, 'keep');
-  assert.equal(r.what, KEEP_WHAT);
+  // The head reading is amber but not clear enough to coach: never "clearly off. Nice."
+  assert.equal(keepReason(analysis, coaching), 'unclear');
+  assert.equal(r.what, UNCLEAR_WHAT);
   assert.equal(r.drill.title, 'Count and nine-to-three');
   assert.ok(!r.areas.some((a) => a.status === 'work'));
   assert.equal(r.areas.find((a) => a.id === 'head').status, 'look');
@@ -175,4 +178,85 @@ test('PROTECT is off for new installs and kept as it was for saved settings', ()
   assert.equal(mergeSettings(upgradeStored({ handed: 'left' }), null).protect, true, 'saved before the change: the old default, on');
   assert.equal(mergeSettings(upgradeStored({ protect: true, simpleMode: true }), null).protect, true);
   assert.equal(mergeSettings(upgradeStored({ protect: false }), null).protect, false);
+});
+
+// ---------- council round 1 findings ----------
+
+test('a clean swing (every reading green) is the only one called clearly fine', () => {
+  const { analysis, coaching } = analyse({ view: 'dtl', earlyExtension: 0.0, spineLossDeg: 0 });
+  const clean = { ...analysis, metrics: analysis.metrics.map((m) => (m.band === 'amber' || m.band === 'red' ? { ...m, band: 'green' } : m)) };
+  const c = coach(clean, { club: '7i', protect: false });
+  assert.equal(keepReason(clean, c), 'clean');
+  assert.equal(simpleResult(clean, c).what, KEEP_WHAT);
+});
+
+test('PROTECT with a bent lead arm says it is reported, not that the swing is fine', () => {
+  const { analysis } = analyse(FO_DEMO, { protect: true });
+  const bent = { ...analysis, metrics: analysis.metrics.map((m) => (m.id === 'leadArmImpact' ? { ...m, value: 120, band: 'red' } : m)) };
+  const c = coach(bent, { club: '7i', protect: true });
+  assert.equal(c.headline.title, KEEP_TEMPO_TITLE);
+  const r = simpleResult(bent, c, { handed: 'right' });
+  assert.equal(r.what, PROTECTED_WHAT);
+  assert.match(r.why, /left arm is reported, not coached/);
+  assert.equal(simpleResult(bent, c, { handed: 'left' }).why.includes('right arm'), true);
+});
+
+test('an unsure red reading is never called Good, and never praised', () => {
+  const { analysis, coaching } = analyse(FO_DEMO);
+  const unsure = { ...analysis, metrics: analysis.metrics.map((m) => (m.id === 'headImpact' ? { ...m, value: -12, band: 'red', confidence: 0.45 } : m)) };
+  const c = coach(unsure, { club: '7i', protect: true });
+  const head = glance(unsure, c).find((a) => a.id === 'head');
+  assert.equal(head.status, 'look');
+  assert.ok(!niceWork(unsure, c).some((n) => n.areaId === 'head'));
+  assert.notEqual(simpleResult(unsure, c).what, KEEP_WHAT);
+});
+
+test('the one thing always marks its own area, even when that reading is unsure', () => {
+  const { analysis, coaching } = analyse(FO_DEMO);
+  const unsure = { ...analysis, metrics: analysis.metrics.map((m) => (m.id === 'headImpact' ? { ...m, value: -12, band: 'red', confidence: 0.3 } : m)) };
+  // A record saved before the confidence gate: its headline is the unsure metric.
+  const old = { ...coaching, headline: { ...coaching.headline, metricId: 'headImpact', title: 'Head lateral at impact', cue: 'Head stays behind the line until the ball is gone.' } };
+  const head = glance(unsure, old).find((a) => a.id === 'head');
+  assert.equal(head.status, 'work');
+  assert.ok(!niceWork(unsure, old).some((n) => n.areaId === 'head'));
+});
+
+test('only rhythm read (angle unknown) is an unread swing, not a nice one', () => {
+  const { analysis, coaching } = analyse(FO_DEMO);
+  const onlyTempo = { ...analysis, view: 'unknown', metrics: analysis.metrics.map((m) => (m.id === 'tempo' ? m : { ...m, value: null, band: 'na' })) };
+  const c = coach(onlyTempo, { club: '7i', protect: false });
+  const r = simpleResult(onlyTempo, c);
+  assert.equal(r.state, 'unseen');
+  assert.deepEqual(r.nice, []);
+  assert.equal(r.askView, true);
+});
+
+test('a swing saved by the first build (no cue, no drill card) still has a headline', () => {
+  const { analysis, coaching } = analyse(DTL_DEMO);
+  const v1 = { ...coaching, headline: { metricId: 'earlyExtension', title: 'Early extension', what: 'x', why: 'y', drill: 'z', watchFor: 'w' } };
+  const r = simpleResult(analysis, v1);
+  assert.equal(r.state, 'fault');
+  assert.equal(r.cue, 'Early extension');
+  assert.equal(r.drill, null);
+});
+
+test('every why is hedged the way the coach hedges', () => {
+  const ids = AREAS.flatMap((a) => a.ids);
+  for (const id of ids) {
+    for (const value of [-20, 0.5, 20, 200]) {
+      const { why } = plainFault({ id, value, band: 'red', confidence: 1 }, { club: '7i' });
+      const first = why.split(/[.,]/)[0];
+      assert.match(first, /\b(often|can|tends?|may|could|called|Good players|hard to hold|more slide than turn|Setting|Too much|Some|A steady)\b/, `${id} at ${value}: "${first}"`);
+    }
+  }
+});
+
+test('first launch with nothing saved: returning golfers keep the full view and PROTECT', () => {
+  const shell = 'shell-2026-09-27.4';
+  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: [], currentShell: shell }), { simpleMode: true, protect: false });
+  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: [shell], currentShell: shell }), { simpleMode: true, protect: false }, 'this build\'s own cache is not a sign of an old visit');
+  assert.deepEqual(firstRunPatch({ swingCount: 3, cacheKeys: [], currentShell: shell }), { simpleMode: false, protect: true }, 'saved swings');
+  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: ['shell-2026-09-17.5'], currentShell: shell }), { simpleMode: false, protect: true }, 'an older build\'s cache');
+  assert.deepEqual(firstRunPatch({ swingCount: 0, cacheKeys: ['tracker-v1'], currentShell: shell }), { simpleMode: false, protect: true }, 'the tracker was downloaded before');
+  assert.deepEqual(firstRunPatch(), { simpleMode: true, protect: false });
 });

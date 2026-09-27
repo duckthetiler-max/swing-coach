@@ -6,7 +6,7 @@ import { detectView } from './angle.js';
 import { estimateScale } from './scale.js';
 import { computeMetrics, buildQuality } from './metrics.js';
 import { coach } from './coach.js';
-import { saveSwing, getSwing, deleteSwing, listSwings, getSettings, saveSettings } from './store.js';
+import { saveSwing, getSwing, deleteSwing, listSwings, getSettings, saveSettings, hasStoredSettings, firstRunPatch } from './store.js';
 import { composeStill, drawBody, drawGuides, drawCallouts } from './overlay.js';
 import { calloutsFor } from './markers.js';
 import { renderHome } from './ui/home.js';
@@ -21,7 +21,7 @@ import { openCamera, closeCamera, cameraSettings, LiveCapture, retrackPictures, 
 import { buildLiveClip } from './live.js';
 import { renderCapture, paintLive, refreshLiveCounters } from './ui/capture.js';
 
-export const BUILD = '2026-09-27.3';
+export const BUILD = '2026-09-27.4';
 
 const root = document.getElementById('app');
 const state = {
@@ -678,7 +678,22 @@ function showDevScreen(which) {
   return false;
 }
 
+/**
+ * Nothing saved yet: decide once whether this is a new golfer or a returning one, before
+ * anything is shown, and save it so the answer never changes. Runs before the service
+ * worker registers, so this build's own caches cannot be mistaken for an older build's.
+ */
+async function settleFirstRun() {
+  if (hasStoredSettings()) return;
+  let swingCount = 0;
+  let cacheKeys = [];
+  try { swingCount = (await listSwings()).length; } catch { /* no database: nothing saved */ }
+  try { if (globalThis.caches) cacheKeys = await caches.keys(); } catch { /* no cache storage */ }
+  state.settings = saveSettings(firstRunPatch({ swingCount, cacheKeys, currentShell: `shell-${BUILD}` }));
+}
+
 async function start() {
+  await settleFirstRun();
   const params = new URLSearchParams(location.search);
   if (params.get('club')) state.settings = saveSettings({ club: params.get('club') });
   registerWorker();

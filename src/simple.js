@@ -47,12 +47,20 @@ const PROTECTED_IDS = new Set(['leadArmTop', 'leadArmImpact']);
 
 export const STATUS_WORDS = Object.freeze({ good: 'Good', look: 'Worth a look', work: 'Work on this' });
 
-/** Measured, scored and tracked with enough confidence to say anything about. */
-function readable(m) {
+/** Measured and scored: it has a value and a band. */
+function scored(m) {
   return !!m && typeof m.value === 'number' && Number.isFinite(m.value)
     && (m.band === 'green' || m.band === 'amber' || m.band === 'red')
-    && !m.suppressed && !m.gated
-    && (typeof m.confidence !== 'number' || m.confidence >= MIN_HEADLINE_CONFIDENCE);
+    && !m.suppressed && !m.gated;
+}
+
+/** Scored and tracked with enough confidence to call it good. */
+function readable(m) {
+  return scored(m) && (typeof m.confidence !== 'number' || m.confidence >= MIN_HEADLINE_CONFIDENCE);
+}
+
+function offBand(m) {
+  return m.band === 'amber' || m.band === 'red';
 }
 
 /** True when the coach found a real fault, not the "keep your tempo" fallback. */
@@ -63,8 +71,10 @@ export function isRealFault(coaching) {
 
 /**
  * The glance: one row per body area this clip measured. The area holding the coach's
- * headline says "Work on this"; any other area with an amber or red metric says "Worth a
- * look"; an all-green area says "Good". Areas with nothing readable are left out.
+ * headline says "Work on this", whatever its confidence. Any other area with an amber or
+ * red metric says "Worth a look", including one tracked with low confidence: an unsure red
+ * is never called good. "Good" needs every metric green and read with confidence. Areas
+ * with nothing scored are left out.
  */
 export function glance(analysis, coaching) {
   const metrics = analysis && Array.isArray(analysis.metrics) ? analysis.metrics : [];
@@ -73,17 +83,32 @@ export function glance(analysis, coaching) {
   const protect = !!(coaching && coaching.protect);
   const out = [];
   for (const area of AREAS) {
-    const ms = area.ids
+    const all = area.ids
       .filter((id) => !(protect && PROTECTED_IDS.has(id)))
       .map((id) => byId.get(id))
-      .filter(readable);
-    if (!ms.length) continue;
+      .filter(scored);
+    const sure = all.filter(readable);
+    const unsureOff = all.filter((m) => !readable(m) && offBand(m));
+    const holdsFocus = !!focus && all.some((m) => m.id === focus);
+    if (!sure.length && !unsureOff.length && !holdsFocus) continue;
     let status = 'good';
-    if (focus && ms.some((m) => m.id === focus)) status = 'work';
-    else if (ms.some((m) => m.band !== 'green')) status = 'look';
-    out.push({ id: area.id, label: area.label, status, word: STATUS_WORDS[status], metricIds: ms.map((m) => m.id) });
+    if (holdsFocus) status = 'work';
+    else if (unsureOff.length || sure.some(offBand)) status = 'look';
+    const shown = holdsFocus ? all : [...sure, ...unsureOff];
+    out.push({ id: area.id, label: area.label, status, word: STATUS_WORDS[status], metricIds: shown.map((m) => m.id) });
   }
   return out;
+}
+
+/** Why the coach fell back to rhythm: 'protected' (a lead-arm reading PROTECT keeps
+ * uncoached), 'unclear' (a red or amber reading not clear enough to coach) or 'clean'. */
+export function keepReason(analysis, coaching) {
+  const metrics = analysis && Array.isArray(analysis.metrics) ? analysis.metrics.filter(Boolean) : [];
+  const inGlance = new Set(AREAS.flatMap((a) => a.ids));
+  const off = metrics.filter((m) => scored(m) && offBand(m) && inGlance.has(m.id));
+  if (coaching && coaching.protect && off.some((m) => PROTECTED_IDS.has(m.id))) return 'protected';
+  if (off.some((m) => !PROTECTED_IDS.has(m.id) || !(coaching && coaching.protect))) return 'unclear';
+  return 'clean';
 }
 
 // ---------- nice work ----------
@@ -130,8 +155,8 @@ function sideOf(m, club, model) {
   return 'unknown';
 }
 
-const LOW_POINT = 'When your head moves, the bottom of your swing moves too, so you can hit it fat or thin.';
-const RHYTHM_WHY = 'A steady rhythm, the same on every swing, makes good contact easier to repeat.';
+const LOW_POINT = 'A moving head often moves the bottom of your swing too, so you can hit it fat or thin.';
+const RHYTHM_WHY = 'A steady rhythm, the same on every swing, tends to make good contact easier to repeat.';
 const ROUGH_READ = 'This is a rough read from your hands only.';
 
 /**
@@ -146,11 +171,11 @@ export function plainFault(m, { handed = 'right', club = null, model = null } = 
   switch (m.id) {
     case 'earlyExtension':
       return v > 0
-        ? { what: 'Your hips move toward the ball as you swing down.', why: 'That squeezes your arms, so one shot can go left and the next one right.' }
-        : { what: 'Your hips move back, away from the ball, as you swing down.', why: 'That changes where the club meets the ground, so contact can suffer.' };
+        ? { what: 'Your hips move toward the ball as you swing down.', why: 'That often squeezes your arms, so one shot can go left and the next one right.' }
+        : { what: 'Your hips move back, away from the ball, as you swing down.', why: 'That can change where the club meets the ground, so contact can suffer.' };
     case 'spineDelta':
       return v < 0
-        ? { what: 'You stand up out of your posture before you hit the ball.', why: 'Your hands then have to flick at the ball to find it, so shots can go left or right.' }
+        ? { what: 'You stand up out of your posture before you hit the ball.', why: 'That often goes with the hands flicking at the ball, so shots can go left or right.' }
         : { what: 'You bend over more on the way down than you did at the start.', why: 'That can make the club hit the ground before the ball.' };
     case 'spineAddress':
       return side === 'low'
@@ -161,13 +186,13 @@ export function plainFault(m, { handed = 'right', club = null, model = null } = 
         ? { what: 'Your hands come down further out than they went back, a move called over the top.', why: `That can send the club across the ball, so shots can pull or slice. ${ROUGH_READ}` }
         : { what: 'Your hands drop in behind you on the way down.', why: `That can leave the club stuck behind you, and a late flick of the hands can hook the ball. ${ROUGH_READ}` };
     case 'hipSlide':
-      if (side === 'high') return { what: 'Your hips slide past the ball instead of turning.', why: 'Your upper body can fall behind, so your hands flick at the ball to catch up.' };
+      if (side === 'high') return { what: 'Your hips slide past the ball instead of turning.', why: 'Your upper body can fall behind, so your hands can flick at the ball to catch up.' };
       if (v < 0) return { what: 'Your hips move back, away from the target, as you hit the ball.', why: 'That is called hanging back, and it often puts the club into the ground behind the ball.' };
       return { what: 'Your hips barely move toward the target by the time you hit the ball.', why: 'Good players have their hips clearly closer to the target when they hit it.' };
     case 'hipSway':
       return v < 0
-        ? { what: 'Your hips slide away from the target as you swing back.', why: 'Then you have to slide back again to reach the ball, which makes contact hit and miss.' }
-        : { what: 'Your hips drift toward the target as you swing back.', why: 'That tips your upper body toward the target, and your weight can fall back later.' };
+        ? { what: 'Your hips slide away from the target as you swing back.', why: 'Then you often have to slide back to reach the ball, so contact can be hit and miss.' }
+        : { what: 'Your hips drift toward the target as you swing back.', why: 'That can tip your upper body toward the target, and your weight can fall back later.' };
     case 'headTop':
       return { what: v < 0 ? 'Your head moves away from the target as you swing back.' : 'Your head moves toward the target as you swing back.', why: LOW_POINT };
     case 'headImpact':
@@ -185,13 +210,13 @@ export function plainFault(m, { handed = 'right', club = null, model = null } = 
     case 'weightTop':
       return side === 'high'
         ? { what: 'Your weight moves onto your front foot as you swing back.', why: 'Your weight then tends to fall back as you swing down.' }
-        : { what: 'Your weight goes a long way onto your back foot as you swing back.', why: 'Getting back to the ball then becomes a guess.' };
+        : { what: 'Your weight goes a long way onto your back foot as you swing back.', why: 'Getting back to the ball then tends to become a guess.' };
     case 'reversePivot':
       return { what: 'Your upper body leans toward the target at the top of your swing.', why: 'Your weight then tends to fall back as you swing through, and it can strain your lower back.' };
     case 'shoulderTiltImpact':
       return v < 0
         ? { what: `Your ${lead} shoulder is lower than your ${trail} shoulder as you hit the ball.`, why: 'That often makes the swing steep, so shots can slice.' }
-        : { what: 'Your shoulders level out as you hit the ball.', why: 'That often makes the swing steep, so shots can slice.' };
+        : { what: 'Your shoulders tilt less as you hit the ball than they did at the start.', why: 'That often makes the swing steep, so shots can slice.' };
     case 'shoulderTiltAddress':
       if (side === 'high') return { what: `Your ${trail} shoulder is set very low at the start.`, why: 'Too much tilt can make you sway and hit the ground first.' };
       return {
@@ -199,9 +224,9 @@ export function plainFault(m, { handed = 'right', club = null, model = null } = 
         why: `Setting your ${trail} shoulder a little lower makes it easier to turn behind the ball.`,
       };
     case 'leadArmTop':
-      return { what: `Your ${lead} arm bends a lot at the top of your swing.`, why: 'That changes the length of your swing, so contact can vary. A shorter, smoother backswing helps.' };
+      return { what: `Your ${lead} arm bends a lot at the top of your swing.`, why: 'That often changes the length of your swing, so contact can vary. A shorter, smoother backswing can help.' };
     case 'leadArmImpact':
-      return { what: `Your ${lead} elbow folds up just after you hit the ball.`, why: 'That can leave the clubface open, so shots come out weak and slicing.' };
+      return { what: `Your ${lead} elbow folds up just after you hit the ball.`, why: 'That can leave the clubface open, so shots can come out weak and slicing.' };
     case 'trailElbowTop':
       return { what: `Your ${trail} elbow flies up high at the top of your swing.`, why: 'That often makes the club come down steep and across the ball.' };
     case 'tempo':
@@ -215,6 +240,10 @@ export function plainFault(m, { handed = 'right', club = null, model = null } = 
 
 export const KEEP_WHAT = 'Nothing in this swing was clearly off. Nice.';
 export const KEEP_WHY = 'So your one thing is rhythm: keep the same count on every ball.';
+export const UNCLEAR_WHAT = 'Nothing was clear enough to single out this time.';
+export const UNCLEAR_WHY = 'Some readings were close to the line or hard to see, so your one thing is rhythm: keep the same count on every ball. The rest is under "Show me the details".';
+export const PROTECTED_WHAT = 'Nothing we coach was clearly off.';
+const protectedWhy = (lead) => `Your ${lead} arm is reported, not coached, while PROTECT mode is on. So your one thing is rhythm: keep the same count on every ball.`;
 export const UNSEEN_WHAT = 'We could not see enough of your body to coach this swing.';
 export const UNSEEN_WHY = 'Film it again with your whole body and the club in the picture.';
 export const PROTECT_LINE = 'PROTECT mode is on: gentle drills only. Stop straight away if your arm hurts.';
@@ -222,17 +251,20 @@ export const EARLY_DAYS_LINE = 'Early days: these readings are not yet checked a
 
 /**
  * Everything the simple result shows, from an analysis and the coach's output.
- * state: 'fault' (a real one thing), 'keep' (nothing clearly off: rhythm), 'unseen' (nothing
- * readable), 'off' (the coach headline is switched off in Settings).
+ * state: 'fault' (a real one thing), 'keep' (the coach fell back to rhythm; `what` says why:
+ * clean, unclear or protected), 'unseen' (no body reading), 'off' (the coach headline is
+ * switched off in Settings).
  */
 export function simpleResult(analysis, coaching, { handed = 'right', club = null, model = null, coachingOn = true } = {}) {
   const h = coaching && coaching.headline ? coaching.headline : null;
   // With the coach switched off nothing is singled out: no area says "Work on this".
   const seen = coachingOn ? coaching : { protect: !!(coaching && coaching.protect), headline: null };
   const areas = glance(analysis, seen);
+  // Rhythm alone says nothing about the body, unless rhythm is the coach's one thing.
+  const bodyRead = areas.some((a) => a.id !== 'rhythm' || a.status === 'work');
   let state;
   if (!coachingOn) state = 'off';
-  else if (!areas.length) state = 'unseen';
+  else if (!bodyRead) state = 'unseen';
   else if (isRealFault(coaching)) state = 'fault';
   else state = 'keep';
 
@@ -242,8 +274,10 @@ export function simpleResult(analysis, coaching, { handed = 'right', club = null
     const m = (analysis.metrics || []).find((x) => x && x.id === h.metricId);
     ({ what, why } = plainFault(m, { handed, club, model: model || analysis.model || null }));
   } else if (state === 'keep') {
-    what = KEEP_WHAT;
-    why = KEEP_WHY;
+    const reason = keepReason(analysis, coaching);
+    if (reason === 'protected') { what = PROTECTED_WHAT; why = protectedWhy(sideWords(handed).lead); }
+    else if (reason === 'unclear') { what = UNCLEAR_WHAT; why = UNCLEAR_WHY; }
+    else { what = KEEP_WHAT; why = KEEP_WHY; }
   } else if (state === 'unseen') {
     what = UNSEEN_WHAT;
     why = UNSEEN_WHY;
@@ -254,7 +288,8 @@ export function simpleResult(analysis, coaching, { handed = 'right', club = null
   const nice = state === 'unseen' ? [] : niceWork(analysis, seen, { handed });
   return {
     state,
-    cue: coached && h ? h.cue || '' : '',
+    // Swings saved by the first build have no cue: fall back to the headline's title.
+    cue: coached && h ? h.cue || h.title || '' : '',
     what,
     why,
     drill: coached && card ? {
