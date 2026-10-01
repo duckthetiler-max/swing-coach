@@ -21,7 +21,7 @@ import { openCamera, closeCamera, cameraSettings, LiveCapture, retrackPictures, 
 import { buildLiveClip } from './live.js';
 import { renderCapture, paintLive, refreshLiveCounters } from './ui/capture.js';
 
-export const BUILD = '2026-09-27.6';
+export const BUILD = '2026-09-30.1';
 
 const root = document.getElementById('app');
 const state = {
@@ -48,9 +48,12 @@ const chrome = {
 };
 chrome.back.addEventListener('click', () => { if (chrome.backTo) nav(chrome.backTo); });
 
-/** Top-level screens show the tab bar; sub-screens show a back button instead; bare screens show neither. */
+/**
+ * Top-level screens show the tab bar; sub-screens show a back button instead; bare screens
+ * show neither. Top-level screens carry the masthead: their own title leads the page.
+ */
 function setChrome({ title, tab = null, back = null, bare = false }) {
-  chrome.title.textContent = title;
+  chrome.title.textContent = tab ? 'Swing Coach' : title;
   chrome.backTo = back;
   chrome.back.hidden = !back;
   document.body.dataset.screen = bare ? 'bare' : back ? 'sub' : 'tab';
@@ -59,13 +62,25 @@ function setChrome({ title, tab = null, back = null, bare = false }) {
 }
 
 let lastScreen = null;
+const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
+/**
+ * A new screen fades in once: the first thing it draws rises into place. A re-render of the
+ * same screen (a setting changed, a progress tick, the camera starting) never replays it.
+ */
 function enterScreen(key) {
   if (key === lastScreen) return;
   lastScreen = key;
   root.scrollTop = 0;
-  root.classList.remove('enter');
-  void root.offsetWidth;
-  root.classList.add('enter');
+  if (calm.matches) return;
+  // Some screens draw after a read (a saved swing): wait for the new screen, never the old one.
+  const stale = root.firstElementChild;
+  let frames = 0;
+  const rise = () => {
+    const first = root.firstElementChild;
+    if (first === stale) { if (frames++ < 30) requestAnimationFrame(rise); return; }
+    if (first && first.animate) first.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 280, easing: 'ease-out' });
+  };
+  requestAnimationFrame(rise);
 }
 
 // ---------- routing ----------
@@ -309,6 +324,7 @@ async function ingestLiveSwing(seg, { w, h }) {
   const metric = hl ? swing.analysis.metrics.find((m) => m.id === hl.metricId) : null;
   swing.band = metric && metric.band && metric.band !== 'na' ? metric.band : null;
   try {
+    await fontsReady();
     swing.stills = swing.images ? await stillsFromImages(swing) : drawStills(swing);
   } catch (err) {
     console.warn('Stills failed', err);
@@ -332,7 +348,7 @@ async function stillsFromImages(c) {
     if (!frame) continue;
     const raw = await blobToDataUrl(c.images[i]);
     if (!raw) { if (!fallback) fallback = drawStills(c); out[key] = fallback[key]; continue; }
-    out[key] = await composeStill(raw, frame, { ...STILL_OPTS, ...stillStyle(c, key), handed: state.settings.handed, view: c.analysis.view, phase: key, reference: key === 'p1' ? null : ref });
+    out[key] = await composeStill(raw, frame, { ...stillStyle(c, key), handed: state.settings.handed, view: c.analysis.view, phase: key, reference: key === 'p1' ? null : ref });
   }
   return out;
 }
@@ -497,6 +513,7 @@ async function finishAnalysis({ video, clip, club, viewChoice, demo }) {
   }
   updateProgress({ pct: 100, label: 'Capturing the positions' });
   try {
+    await fontsReady();
     state.current.stills = video ? await captureStills(state.current) : drawStills(state.current);
   } catch (err) {
     console.warn('Stills failed', err);
@@ -523,7 +540,12 @@ function recomputeFor(c) {
   c.coaching = coach(c.analysis, { club: c.club, protect: false, handed: s.handed, model: s.swingModel });
 }
 
-const STILL_OPTS = { accent: '#30d158', ink: '#ffffff' };
+/** The labels on the pictures are set in Inter; wait for it so no still is drawn in a fallback. */
+async function fontsReady() {
+  try {
+    if (document.fonts) await Promise.all([document.fonts.load('700 16px Inter'), document.fonts.ready]);
+  } catch { /* draw with the fallback face */ }
+}
 
 async function captureStills(c) {
   const out = {};
@@ -533,7 +555,7 @@ async function captureStills(c) {
     if (!frame) continue;
     await seekTo(c.video, frame.t);
     const raw = captureFrame(c.video, 480);
-    out[key] = await composeStill(raw, frame, { ...STILL_OPTS, ...stillStyle(c, key), handed: state.settings.handed, view: c.analysis.view, phase: key, reference: key === 'p1' ? null : ref });
+    out[key] = await composeStill(raw, frame, { ...stillStyle(c, key), handed: state.settings.handed, view: c.analysis.view, phase: key, reference: key === 'p1' ? null : ref });
   }
   return out;
 }
@@ -545,6 +567,7 @@ function stillStyle(c, key) {
 
 /** Build the four stills whatever the source: a video, captured pictures, or the demo. */
 async function makeStills(c) {
+  await fontsReady();
   if (c.video) return captureStills(c);
   if (c.images) return stillsFromImages(c);
   return drawStills(c);
@@ -563,14 +586,12 @@ function drawStills(c) {
     canvas.width = w; canvas.height = h;
     const ctx = canvas.getContext('2d');
     // A plain backdrop with a ground line under the feet, so the figure stands on something.
-    const sky = ctx.createLinearGradient(0, 0, 0, h);
-    sky.addColorStop(0, '#2a2a2a'); sky.addColorStop(1, '#141414');
-    ctx.fillStyle = sky; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#1a1a1a'; ctx.fillRect(0, 0, w, h);
     const groundY = Math.max(frame.lm[27].y, frame.lm[28].y, frame.lm[29].y, frame.lm[30].y) * h + 6;
-    ctx.fillStyle = '#333333'; ctx.fillRect(0, groundY, w, h - groundY);
-    ctx.strokeStyle = '#8a8a8a'; ctx.lineWidth = 2;
+    ctx.fillStyle = '#242424'; ctx.fillRect(0, groundY, w, h - groundY);
+    ctx.strokeStyle = '#5c5c5c'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(w, groundY); ctx.stroke();
-    const o = { ...STILL_OPTS, handed: state.settings.handed, scaleX: w / frame.w, scaleY: h / frame.h, reference: key === 'p1' ? null : ref };
+    const o = { handed: state.settings.handed, scaleX: w / frame.w, scaleY: h / frame.h, reference: key === 'p1' ? null : ref };
     drawGuides(ctx, frame, c.analysis.view, key, o);
     drawBody(ctx, frame, { ...o, ...stillStyle(c, key) });
     drawCallouts(ctx, frame, stillStyle(c, key).callouts, o);

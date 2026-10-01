@@ -9,13 +9,16 @@ import {
   LEFT_HEEL, RIGHT_HEEL, LEFT_FOOT_INDEX, RIGHT_FOOT_INDEX,
 } from './landmarks.js';
 
+// White on the picture, the lead side solid, the trail side a quieter grey, a dark halo so
+// it reads on any footage. The only colour is a band square on a number's label.
 const DEFAULTS = Object.freeze({
   handed: 'right',
   scaleX: 1,
   scaleY: 1,
-  accent: '#3ddc84',
+  accent: '#ffffff',
   ink: '#ffffff',
-  halo: 'rgba(0, 0, 0, 0.45)',
+  trail: '#a6a6a6',
+  halo: 'rgba(0, 0, 0, 0.5)',
   minVisibility: 0.3,
   lineWidth: null,
   reference: null,
@@ -23,6 +26,7 @@ const DEFAULTS = Object.freeze({
 });
 
 const PHASE_LABEL = { p1: 'P1 Address', p4: 'P4 Top', p7: 'P7 Impact', p10: 'P10 Finish' };
+const SANS = 'Inter, "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif';
 
 function options(opts) {
   return { ...DEFAULTS, ...(opts || {}) };
@@ -40,6 +44,21 @@ function point(frame, idx, o) {
 
 function leadIndices(handed) {
   return new Set(Object.values(sides(handed).lead));
+}
+
+function trailIndices(handed) {
+  return new Set(Object.values(sides(handed).trail));
+}
+
+/** A segment in the lead colour, the trail colour, or ink when it joins the two sides. */
+function sideColor(lead, trail, o, a, b) {
+  if (lead.has(a) && lead.has(b)) return o.accent;
+  if (trail.has(a) && trail.has(b)) return o.trail;
+  return o.ink;
+}
+
+function jointColor(lead, trail, o, idx) {
+  return lead.has(idx) ? o.accent : trail.has(idx) ? o.trail : o.ink;
 }
 
 function stroke(ctx, a, b, color, width) {
@@ -79,13 +98,14 @@ function withAlpha(color, alpha) {
 
 /**
  * Draw the body of one frame as a figure: a head, a filled torso, tapered limbs, hands
- * and feet. The lead side (nearest the target) is in the accent colour, the rest in ink.
- * Returns false when the frame has no pose.
+ * and feet. The lead side (nearest the target) is in the accent colour, the trail side in
+ * the trail colour, the rest in ink. Returns false when the frame has no pose.
  */
 export function drawSkeleton(ctx, frame, opts) {
   if (!validFrame(frame)) return false;
   const o = options(opts);
   const lead = leadIndices(o.handed);
+  const trail = trailIndices(o.handed);
   const P = (idx) => point(frame, idx, o);
   const visible = (idx) => P(idx).v >= o.minVisibility;
 
@@ -93,7 +113,7 @@ export function drawSkeleton(ctx, frame, opts) {
   const hm = mid(P(LEFT_HIP), P(RIGHT_HIP));
   const torso = dist(sm, hm);
   const unit = Math.max(1.5, torso / 16, baseWidth(ctx, o) * 0.6);
-  const colorFor = (a, b) => (lead.has(a) && lead.has(b) ? o.accent : o.ink);
+  const colorFor = (a, b) => sideColor(lead, trail, o, a, b);
 
   ctx.save();
   ctx.lineCap = 'round';
@@ -124,11 +144,11 @@ export function drawSkeleton(ctx, frame, opts) {
     ctx.strokeStyle = o.ink;
     ctx.lineWidth = unit * 1.6;
     ctx.stroke();
-    // Shoulder line and hip line in the side colours (lead half accent).
-    stroke(ctx, ls, sm, lead.has(LEFT_SHOULDER) ? o.accent : o.ink, unit * 1.6);
-    stroke(ctx, rs, sm, lead.has(RIGHT_SHOULDER) ? o.accent : o.ink, unit * 1.6);
-    stroke(ctx, lh, hm, lead.has(LEFT_HIP) ? o.accent : o.ink, unit * 1.6);
-    stroke(ctx, rh, hm, lead.has(RIGHT_HIP) ? o.accent : o.ink, unit * 1.6);
+    // Shoulder line and hip line in the side colours.
+    stroke(ctx, ls, sm, jointColor(lead, trail, o, LEFT_SHOULDER), unit * 1.6);
+    stroke(ctx, rs, sm, jointColor(lead, trail, o, RIGHT_SHOULDER), unit * 1.6);
+    stroke(ctx, lh, hm, jointColor(lead, trail, o, LEFT_HIP), unit * 1.6);
+    stroke(ctx, rh, hm, jointColor(lead, trail, o, RIGHT_HIP), unit * 1.6);
   }
 
   // 3. Limbs, tapered, then feet.
@@ -144,11 +164,11 @@ export function drawSkeleton(ctx, frame, opts) {
   // 4. Joints: soft dots at elbows and knees; hands as bigger discs at the wrists.
   for (const idx of [LEFT_ELBOW, RIGHT_ELBOW, LEFT_KNEE, RIGHT_KNEE]) {
     if (!visible(idx)) continue;
-    disc(ctx, P(idx), unit * 0.9, lead.has(idx) ? o.accent : o.ink, o.halo);
+    disc(ctx, P(idx), unit * 0.9, jointColor(lead, trail, o, idx), o.halo);
   }
   for (const idx of [LEFT_WRIST, RIGHT_WRIST]) {
     if (!visible(idx)) continue;
-    disc(ctx, P(idx), unit * 1.3, lead.has(idx) ? o.accent : o.ink, o.halo);
+    disc(ctx, P(idx), unit * 1.3, jointColor(lead, trail, o, idx), o.halo);
   }
 
   // 5. Head: a disc centred between the ears (or on the nose), with a nose mark that
@@ -263,22 +283,24 @@ export function drawGuides(ctx, frame, view, phase, opts) {
   const o = options(opts);
   const width = baseWidth(ctx, o);
   if (o.reference && validFrame(o.reference) && o.reference !== frame) {
-    drawGuideSet(ctx, o.reference, o, { color: o.ink, dashed: true, width: Math.max(1, width * 0.7) });
+    drawGuideSet(ctx, o.reference, o, { color: withAlpha(o.ink, 0.5), dashed: true, width: Math.max(1, width * 0.7) });
   }
-  const g = drawGuideSet(ctx, frame, o, { color: o.accent, dashed: false, width });
+  const g = drawGuideSet(ctx, frame, o, { color: withAlpha(o.ink, 0.85), dashed: false, width: Math.max(1, width * 0.8) });
 
+  // The position's name on a white tag in the corner, like a caption on a print.
   if (o.label && PHASE_LABEL[phase]) {
-    const size = Math.max(12, Math.round(ctx.canvas.width / 24));
-    const text = PHASE_LABEL[phase] + (view === 'fo' ? ', face-on' : view === 'dtl' ? ', down-the-line' : '');
+    const size = Math.max(10, Math.round(ctx.canvas.width / 32));
+    const text = `${PHASE_LABEL[phase]}${view === 'fo' ? ' · face-on' : view === 'dtl' ? ' · down-the-line' : ''}`.toUpperCase();
     ctx.save();
-    ctx.font = `600 ${size}px system-ui, sans-serif`;
+    ctx.font = `700 ${size}px ${SANS}`;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = `${(size * 0.06).toFixed(1)}px`;
     ctx.textBaseline = 'top';
-    const pad = Math.round(size * 0.4);
+    const pad = Math.round(size * 0.7);
     const tw = ctx.measureText(text).width;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-    ctx.fillRect(pad, pad, tw + pad * 2, size + pad * 1.4);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(text, pad * 2, pad * 1.7);
+    ctx.fillRect(pad, pad, tw + pad * 2, size + pad * 1.6);
+    ctx.fillStyle = '#111111';
+    ctx.fillText(text, pad * 2, pad * 1.8);
     ctx.restore();
   }
   return !!g;
@@ -303,17 +325,20 @@ const MARKER_JOINTS = [
   LEFT_HIP, RIGHT_HIP, LEFT_KNEE, RIGHT_KNEE, LEFT_ANKLE, RIGHT_ANKLE,
 ];
 
-export const BAND_COLOR = Object.freeze({ green: '#30d158', amber: '#ffd60a', red: '#ff453a', na: '#8e8e93' });
+// The same three band colours as the report card (styles.css --band-*).
+export const BAND_COLOR = Object.freeze({ green: '#2e7d4f', amber: '#b8860b', red: '#b3261e', na: '#8c8c8c' });
 
 /**
  * Draw the tracked joints as markers: thin bones, a dot on every joint (lead side in the
- * accent colour, hollow when the tracker was unsure), a ring for the head and crosshairs
- * on the two centres the measurements use (shoulder centre and hip centre).
+ * accent colour, trail side in the trail colour, hollow when the tracker was unsure), a
+ * ring for the head and crosshairs on the two centres the measurements use (shoulder
+ * centre and hip centre).
  */
 export function drawMarkers(ctx, frame, opts) {
   if (!validFrame(frame)) return false;
   const o = options(opts);
   const lead = leadIndices(o.handed);
+  const trail = trailIndices(o.handed);
   const P = (idx) => point(frame, idx, o);
   const visible = (idx) => P(idx).v >= o.minVisibility;
   const sm = mid(P(LEFT_SHOULDER), P(RIGHT_SHOULDER));
@@ -327,21 +352,23 @@ export function drawMarkers(ctx, frame, opts) {
   for (const [a, b] of MARKER_BONES) {
     if (!visible(a) || !visible(b)) continue;
     stroke(ctx, P(a), P(b), o.halo, unit * 2.6);
-    stroke(ctx, P(a), P(b), lead.has(a) && lead.has(b) ? o.accent : o.ink, unit);
+    stroke(ctx, P(a), P(b), sideColor(lead, trail, o, a, b), unit);
   }
   // Spine: shoulder centre to hip centre, the line the posture numbers are read from.
   if ([LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP].every(visible)) {
     stroke(ctx, sm, hm, o.halo, unit * 2.6);
     stroke(ctx, sm, hm, o.ink, unit);
     for (const c of [sm, hm]) {
-      stroke(ctx, { x: c.x - r, y: c.y }, { x: c.x + r, y: c.y }, o.accent, unit);
-      stroke(ctx, { x: c.x, y: c.y - r }, { x: c.x, y: c.y + r }, o.accent, unit);
+      stroke(ctx, { x: c.x - r, y: c.y }, { x: c.x + r, y: c.y }, o.halo, unit * 2.6);
+      stroke(ctx, { x: c.x, y: c.y - r }, { x: c.x, y: c.y + r }, o.halo, unit * 2.6);
+      stroke(ctx, { x: c.x - r, y: c.y }, { x: c.x + r, y: c.y }, o.ink, unit);
+      stroke(ctx, { x: c.x, y: c.y - r }, { x: c.x, y: c.y + r }, o.ink, unit);
     }
   }
   for (const idx of MARKER_JOINTS) {
     const p = P(idx);
     if (p.v < o.minVisibility) continue;
-    const color = lead.has(idx) ? o.accent : o.ink;
+    const color = jointColor(lead, trail, o, idx);
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.fillStyle = p.v >= 0.6 ? color : 'rgba(0, 0, 0, 0.35)';
@@ -388,16 +415,19 @@ function anchorPoint(frame, anchor, o) {
 
 /**
  * Write measured numbers on the picture. callouts = [{ label, text, band, anchor }] from
- * markers.js. Each gets a ring on its body part, a leader line and a two-line label at the
- * nearer edge of the picture, coloured by band. Labels on the same side stack downward.
+ * markers.js. Each gets a ring on its body part, a leader line and a two-line white label
+ * at the nearer edge of the picture: the band square and the name in small capitals, then
+ * the number. Labels on the same side stack downward.
  */
 export function drawCallouts(ctx, frame, callouts, opts) {
   if (!validFrame(frame) || !Array.isArray(callouts) || !callouts.length) return 0;
   const o = options(opts);
   const W = ctx.canvas.width; const H = ctx.canvas.height;
   const size = Math.max(11, Math.round(W / 27));
-  const small = Math.max(9, Math.round(size * 0.72));
-  const pad = Math.round(size * 0.5);
+  const small = Math.max(9, Math.round(size * 0.66));
+  const pad = Math.round(size * 0.55);
+  const sq = Math.max(6, Math.round(small * 0.8));
+  const tracking = (px) => { if ('letterSpacing' in ctx) ctx.letterSpacing = `${px.toFixed(1)}px`; };
   const centreX = anchorPoint(frame, 'hips', o).x;
   const ring = Math.max(6, dist(anchorPoint(frame, 'shoulders', o), anchorPoint(frame, 'hips', o)) / 8);
   const nextY = { left: Math.round(H * 0.16), right: Math.round(H * 0.16) };
@@ -413,12 +443,15 @@ export function drawCallouts(ctx, frame, callouts, opts) {
     let side = a.x < centreX - 2 ? 'left' : a.x > centreX + 2 ? 'right' : (flip ? 'left' : 'right');
     if (Math.abs(a.x - centreX) <= 2) flip = !flip;
 
-    ctx.font = `700 ${size}px system-ui, sans-serif`;
+    ctx.font = `700 ${size}px ${SANS}`;
+    tracking(0);
     const wText = ctx.measureText(c.text).width;
-    ctx.font = `600 ${small}px system-ui, sans-serif`;
-    const wLabel = ctx.measureText(c.label.toUpperCase()).width;
-    const boxW = Math.min(W * 0.62, Math.max(wText, wLabel) + pad * 2 + 5);
-    const boxH = small + size + pad * 2 + 3;
+    ctx.font = `700 ${small}px ${SANS}`;
+    tracking(small * 0.07);
+    const wLabel = ctx.measureText(c.label.toUpperCase()).width + sq + Math.round(small * 0.6);
+    tracking(0);
+    const boxW = Math.min(W * 0.62, Math.max(wText, wLabel) + pad * 2);
+    const boxH = small + size + pad * 2 + 4;
     const x = side === 'left' ? pad : W - boxW - pad;
     let y = Math.max(nextY[side], Math.min(a.y - boxH / 2, H - boxH - pad));
     y = Math.min(y, H - boxH - pad);
@@ -427,30 +460,34 @@ export function drawCallouts(ctx, frame, callouts, opts) {
     placed.push({ c, a, color, side, x, y, boxW, boxH });
   }
 
-  // Pass 1: rings on the body parts and leaders to the labels.
-  for (const { a, color, side, x, y, boxW, boxH } of placed) {
+  // Pass 1: rings on the body parts and leaders to the labels, white over a dark halo.
+  for (const { a, side, x, y, boxW, boxH } of placed) {
     ctx.beginPath(); ctx.arc(a.x, a.y, ring, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)'; ctx.lineWidth = Math.max(3, size * 0.28); ctx.stroke();
-    ctx.strokeStyle = color; ctx.lineWidth = Math.max(2, size * 0.16); ctx.stroke();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)'; ctx.lineWidth = Math.max(3, size * 0.26); ctx.stroke();
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = Math.max(1.5, size * 0.12); ctx.stroke();
     const edge = { x: side === 'left' ? x + boxW : x, y: y + boxH / 2 };
     const from = { x: a.x + (side === 'left' ? -ring : ring), y: a.y };
-    stroke(ctx, from, edge, 'rgba(0, 0, 0, 0.6)', Math.max(3, size * 0.24));
-    stroke(ctx, from, edge, color, Math.max(1.5, size * 0.12));
+    stroke(ctx, from, edge, 'rgba(0, 0, 0, 0.55)', Math.max(3, size * 0.22));
+    stroke(ctx, from, edge, '#ffffff', Math.max(1.25, size * 0.1));
   }
 
-  // Pass 2: labels on top. Band stripe, small caps name, the number in bold.
-  for (const { c, color, side, x, y, boxW, boxH } of placed) {
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
-    ctx.fillRect(x, y, boxW, boxH);
-    ctx.fillStyle = color;
-    ctx.fillRect(side === 'left' ? x : x + boxW - 5, y, 5, boxH);
-    const tx = x + pad + (side === 'left' ? 5 : 0);
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
-    ctx.font = `600 ${small}px system-ui, sans-serif`;
-    ctx.fillText(c.label.toUpperCase(), tx, y + pad, boxW - pad * 2 - 5);
+  // Pass 2: labels on top. White tag, band square and the name in small capitals, the number.
+  for (const { c, color, x, y, boxW } of placed) {
     ctx.fillStyle = '#ffffff';
-    ctx.font = `700 ${size}px system-ui, sans-serif`;
-    ctx.fillText(c.text, tx, y + pad + small + 3, boxW - pad * 2 - 5);
+    ctx.fillRect(x, y, boxW, small + size + pad * 2 + 4);
+    const tx = x + pad;
+    const room = boxW - pad * 2;
+    ctx.fillStyle = color;
+    ctx.fillRect(tx, y + pad + Math.round((small - sq) / 2), sq, sq);
+    ctx.fillStyle = '#555555';
+    ctx.font = `700 ${small}px ${SANS}`;
+    tracking(small * 0.07);
+    const lx = tx + sq + Math.round(small * 0.6);
+    ctx.fillText(c.label.toUpperCase(), lx, y + pad, Math.max(1, room - (lx - tx)));
+    tracking(0);
+    ctx.fillStyle = '#111111';
+    ctx.font = `700 ${size}px ${SANS}`;
+    ctx.fillText(c.text, tx, y + pad + small + 4, room);
   }
   ctx.restore();
   return placed.length;

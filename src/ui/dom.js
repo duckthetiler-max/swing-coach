@@ -61,28 +61,60 @@ export function chips(options, value, onPick) {
 
 /** Segmented control: one row, every option the same width. options = [[value, label], ...]. */
 export function segmented(options, value, onPick, label) {
-  return el('div', { class: 'seg', role: 'group', 'aria-label': label || null }, options.map(([v, text]) => el('button', {
+  return el('div', { class: options.length > 2 ? 'seg three' : 'seg', role: 'group', 'aria-label': label || null }, options.map(([v, text]) => el('button', {
     type: 'button',
     'aria-pressed': String(String(v) === String(value)),
     onClick: () => onPick(v),
   }, text)));
 }
 
-const CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>';
+const CHEVRON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter" aria-hidden="true"><path d="M9 4l8 8-8 8"/></svg>';
 
-/** Settings-style row: label and detail on the left, a control or a chevron on the right. */
+/** Settings-style row: label and detail on the left, a control or a thin chevron on the right. */
 export function listRow(label, detail, control, onClick) {
   const chev = el('span', { class: 'chev' });
   chev.innerHTML = CHEVRON;
-  const row = el(onClick ? 'button' : 'div', {
+  return el(onClick ? 'button' : 'div', {
     type: onClick ? 'button' : null,
-    class: `list-row${onClick ? ' card tap flat' : ''}`,
+    class: 'list-row',
     onClick: onClick || null,
   },
-  el('div', { class: 'text' }, el('div', { class: 'label' }, label), detail ? el('div', { class: 'detail' }, detail) : null),
+  el('span', { class: 'text' }, el('span', { class: 'label' }, label), detail ? el('span', { class: 'detail' }, detail) : null),
   control || (onClick ? chev : null));
-  if (onClick) { row.style.padding = '12px 14px'; row.style.borderRadius = 'var(--radius-sm)'; }
-  return row;
+}
+
+/** A section: a small capitals label, then its content. */
+export function section(label, ...children) {
+  return el('section', { class: 'sec' }, label ? el('h2', { class: 'kicker' }, label) : null, ...children);
+}
+
+/** The one serif line on a screen. Hyphenated words stay whole: "one-two-three" never splits. */
+export function hero(text, tag = 'h1') {
+  const parts = String(text).split(/(\S+-\S+)/).filter(Boolean);
+  return el(tag, { class: 'hero' }, parts.map((p) => (/^\S+-\S+$/.test(p) ? el('span', { class: 'nowrap' }, p) : p)));
+}
+
+/**
+ * Numbered steps, 01 to 09. items: [{ title, body }] for a step with a heading,
+ * [{ key, body }] for a step named by a small label, or plain strings.
+ */
+export function stepsList(items, cls = '') {
+  return el('ol', { class: `steps ${cls}`.trim() }, items.map((s, i) => {
+    const item = typeof s === 'string' ? { body: s } : s;
+    return el('li', {},
+      el('span', { class: 'n', 'aria-hidden': 'true' }, String(i + 1).padStart(2, '0')),
+      el('div', {},
+        item.key ? el('div', { class: 'k' }, item.key) : null,
+        item.title ? el('div', { class: 't' }, item.title) : null,
+        item.body ? el('div', { class: 'b' }, item.body) : null));
+  }));
+}
+
+/** A row that goes somewhere: a small capitals label and a thin chevron. */
+export function linkRow(label, onClick) {
+  const chev = el('span', { class: 'chev' });
+  chev.innerHTML = CHEVRON;
+  return el('button', { type: 'button', class: 'link-row', onClick }, el('span', {}, label), chev);
 }
 
 export function select(options, value, onChange, cls = '') {
@@ -96,7 +128,7 @@ export function field(label, control, hint) {
   return el('div', { class: 'field' },
     el('span', { class: 'field-label', text: label }),
     control,
-    hint ? el('p', { class: 'muted hint', text: hint }) : null);
+    hint ? el('p', { class: 'hint', text: hint }) : null);
 }
 
 /** Labelled on/off switch row. */

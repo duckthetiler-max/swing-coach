@@ -9,8 +9,8 @@
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
-  "background_color": "#F7F5EE",
-  "theme_color": "#F7F5EE",
+  "background_color": "#FFFFFF",
+  "theme_color": "#FFFFFF",
   "categories": ["sports", "health"],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

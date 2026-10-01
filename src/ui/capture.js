@@ -1,6 +1,6 @@
 // Auto capture screen: live camera with the body drawn on, a status line, the swings seen
 // so far, and the session summary once you stop.
-import { el, button, listRow, clubLabel, fmtDate } from './dom.js';
+import { el, button, listRow, section, hero, stepsList, clubLabel, fmtDate } from './dom.js';
 import { statusWords, STATUS } from '../live.js';
 import { drawBody } from '../overlay.js';
 
@@ -22,19 +22,24 @@ export function renderCapture(root, ctx) {
 }
 
 function intro(settings, actions, error) {
-  return el('div', { class: 'stack' },
-    el('div', { class: 'card stack' },
-      el('div', {}, el('div', { class: 'eyebrow' }, 'Auto capture'), el('h2', {}, 'Prop the phone, hit balls')),
-      el('p', {}, 'The camera watches for a swing and reads each one on its own, so you never touch the phone between balls. A beep tells you a swing was seen.'),
-      el('ol', {},
-        el('li', {}, 'Prop the phone still, chest height, whole body in frame with the club.'),
-        el('li', {}, 'Down-the-line (behind your hands, pointing at the target) shows early extension. Face-on shows sway and slide.'),
-        el('li', {}, 'Stand still at address for a second. Hit. Hold the finish for a second.')),
-      el('div', { class: 'card warn flat' }, el('strong', {}, 'Experimental. '), 'This has not been proven on a real camera yet. Analyse a clip is the dependable path.'),
-      el('p', { class: 'muted small' }, `Club: ${clubLabel(settings.club)}. Change it on Home. A Samsung gives a browser 30 fps, not slow motion, and frames that arrive while the tracker is busy are lost; the screen shows how many were kept. Timing numbers are rougher than a slow-motion clip.`),
-      error ? el('div', { class: 'card bad flat' }, error) : null,
+  return el('div', { class: 'page' },
+    el('section', { class: 'sec' },
+      el('p', { class: 'kicker muted' }, 'Auto capture, experimental'),
+      hero('Prop the phone, hit balls.'),
+      el('p', {}, 'The camera watches for a swing and reads each one on its own, so you never touch the phone between balls. A beep tells you a swing was seen.')),
+    section('Before you start', stepsList([
+      'Prop the phone still, chest height, whole body in frame with the club.',
+      'Down-the-line (behind your hands, pointing at the target) shows early extension. Face-on shows sway and slide.',
+      'Stand still at address for a second. Hit. Hold the finish for a second.',
+    ])),
+    section('Experimental',
+      el('p', { class: 'muted' }, 'This has not been proven on a real camera yet. Analyse a clip is the dependable path.'),
+      el('p', { class: 'caption' }, `Club: ${clubLabel(settings.club)}. Change it on Home. A Samsung gives a browser 30 fps, not slow motion, and frames that arrive while the tracker is busy are lost; the screen shows how many were kept. Timing numbers are rougher than a slow-motion clip.`)),
+    el('section', { class: 'sec' },
+      error ? el('h2', { class: 'kicker' }, 'The camera did not start') : null,
+      error ? el('p', { class: 'lede' }, error) : null,
       button('Start the camera', () => actions.start(), 'btn primary big'),
-      el('p', { class: 'muted small', style: { margin: 0 } }, 'Nothing is recorded to the gallery and nothing leaves the phone. Only the swings you save are kept.')));
+      el('p', { class: 'caption' }, 'Nothing is recorded to the gallery and nothing leaves the phone. Only the swings you save are kept.')));
 }
 
 function liveView(session, settings, actions) {
@@ -47,28 +52,28 @@ function liveView(session, settings, actions) {
 
   const status = el('div', { class: `live-status s-${session.status || 'noBody'}` }, session.starting ? 'Starting the camera and the tracker.' : statusWords(session.status, { reading: session.reading }));
   session.statusEl = status;
-  const fps = el('div', { class: 'live-fps muted small' }, session.camera && session.camera.frameRate ? `Camera says ${Math.round(session.camera.frameRate)} fps` : '');
+  const fps = el('div', { class: 'live-fps caption' }, session.camera && session.camera.frameRate ? `Camera says ${Math.round(session.camera.frameRate)} fps` : '');
   session.fpsEl = fps;
   const count = el('div', { class: 'live-count' }, `${session.swings.length}`);
   session.countEl = count;
-  const last = el('div', { class: 'live-last' }, session.lastLine || 'No swing yet.');
+  const last = el('p', { class: 'live-last' }, session.lastLine || 'No swing yet.');
   session.lastEl = last;
 
   const list = el('div', {}, session.swings.length ? swingList(session, actions) : null);
   session.listEl = list;
 
-  return el('div', { class: 'stack' },
-    el('div', { class: 'card live-card' },
+  return el('div', { class: 'page' },
+    el('section', { class: 'sec' },
       box,
       el('div', { class: 'live-bar' },
-        el('div', { class: 'live-badge' }, el('div', { class: 'eyebrow' }, 'Swings'), count),
+        el('div', { class: 'live-badge' }, el('div', { class: 'kicker muted' }, 'Swings'), count),
         el('div', { class: 'live-text' }, status, fps)),
-      last),
-    el('div', { class: 'row' },
-      button('Stop', () => actions.stop(), 'btn primary'),
-      button(session.facing === 'user' ? 'Use rear camera' : 'Use front camera', () => actions.flip(), 'btn')),
+      last,
+      el('div', { class: 'row' },
+        button('Stop', () => actions.stop(), 'btn primary'),
+        button(session.facing === 'user' ? 'Use rear camera' : 'Use front camera', () => actions.flip(), 'btn'))),
     list,
-    el('p', { class: 'muted small' }, 'Keep this screen open. If the phone locks, the camera stops. Tapping a swing stops the camera too; Start again carries the session on.'));
+    el('p', { class: 'caption' }, 'Keep this screen open. If the phone locks, the camera stops. Tapping a swing stops the camera too; Start again carries the session on.'));
 }
 
 /** Called by the app for every tracked frame: draw the body and refresh the status line. */
@@ -79,7 +84,7 @@ export function paintLive(session, frame, info, settings) {
     if (c.width !== v.videoWidth || c.height !== v.videoHeight) { c.width = v.videoWidth; c.height = v.videoHeight; }
     const ctx = c.getContext('2d');
     ctx.clearRect(0, 0, c.width, c.height);
-    if (frame.lm) drawBody(ctx, frame, { handed: settings.handed, accent: '#30d158', ink: '#ffffff', style: settings.overlayStyle });
+    if (frame.lm) drawBody(ctx, frame, { handed: settings.handed, style: settings.overlayStyle });
   }
   if (session.statusEl && info) {
     const s = info.status;
@@ -102,22 +107,32 @@ export function refreshLiveCounters(session, actions) {
 }
 
 function swingList(session, actions) {
-  return el('div', { class: 'card' },
-    el('div', { class: 'eyebrow' }, 'This session'),
+  return section('This session', el('div', { class: 'rows' },
     ...session.swings.slice().reverse().map((s) => listRow(
       `${s.n}. ${session.coachingOff ? 'Swing' : (s.coaching && s.coaching.headline ? s.coaching.headline.title : 'Swing')}`,
-      `${s.band ? s.band + '. ' : ''}${s.saved ? 'Saved. ' : ''}${fmtDate(s.at)}`,
-      null, () => actions.open(s.n))));
+      `${s.band ? s.band.charAt(0).toUpperCase() + s.band.slice(1) + '. ' : ''}${s.saved ? 'Saved. ' : ''}${fmtDate(s.at)}`,
+      null, () => actions.open(s.n)))));
+}
+
+function drillSection(card) {
+  return section('The drill',
+    el('p', { class: 'subhead' }, card.title),
+    el('div', { class: 'kv' },
+      el('div', {}, el('span', { class: 'k' }, 'Set up'), el('span', { class: 'v' }, card.setup)),
+      el('div', {}, el('span', { class: 'k' }, 'Do'), el('span', { class: 'v' }, card.do)),
+      el('div', {}, el('span', { class: 'k' }, 'Done when'), el('span', { class: 'v' }, card.doneWhen))));
 }
 
 function summary(session, settings, actions) {
   const swings = session.swings;
+  const read = `Session done, ${swings.length} swing${swings.length === 1 ? '' : 's'} read`;
   session.coachingOff = settings.coachHeadline === false;
   if (session.coachingOff) {
     const left = swings.filter((s) => !s.saved).length;
-    return el('div', { class: 'stack' },
-      el('div', { class: 'card flat stack' },
-        el('div', {}, el('div', { class: 'eyebrow' }, 'Session done'), el('h2', {}, `${swings.length} swing${swings.length === 1 ? '' : 's'} read`)),
+    return el('div', { class: 'page' },
+      el('section', { class: 'sec' },
+        el('p', { class: 'kicker muted' }, read),
+        hero('Numbers and pictures only.'),
         el('p', { class: 'muted' }, 'Coaching is switched off in Settings. Open a swing for its numbers and pictures.')),
       swings.length ? swingList(session, actions) : null,
       el('div', { class: 'actionbar' },
@@ -137,21 +152,18 @@ function summary(session, settings, actions) {
   const card = h && h.drillCard;
   const unsaved = swings.filter((s) => !s.saved).length;
 
-  return el('div', { class: 'stack' },
-    el('div', { class: 'card accent stack' },
-      el('div', {}, el('div', { class: 'eyebrow' }, 'Session done'), el('h2', {}, `${swings.length} swing${swings.length === 1 ? '' : 's'} read`)),
-      h ? el('p', { class: 'what' }, `The one thing in ${topN} of ${swings.length}: ${h.title}.`) : el('p', { class: 'muted' }, 'Nothing to coach in these swings.'),
-      h && h.cue ? el('div', { class: 'cue' }, el('div', { class: 'eyebrow' }, 'Your cue for the next bucket'), el('div', { class: 'cue-text' }, h.cue)) : null,
-      card ? el('div', { class: 'drill-card' },
-        el('h3', {}, card.title),
-        el('div', { class: 'kv' }, el('span', { class: 'k' }, 'Drill'), el('span', {}, card.setup)),
-        el('div', { class: 'kv' }, el('span', { class: 'k' }, 'Do'), el('span', {}, card.do)),
-        el('div', { class: 'kv' }, el('span', { class: 'k' }, 'Done when'), el('span', {}, card.doneWhen))) : null),
+  return el('div', { class: 'page' },
+    el('section', { class: 'sec' },
+      el('p', { class: 'kicker muted' }, read),
+      h ? el('h2', { class: 'kicker' }, h.cue ? 'Your cue for the next bucket' : 'The one thing') : null,
+      hero(h ? h.cue || h.title : 'Nothing to coach in these swings.'),
+      h ? el('p', { class: 'lede' }, `The one thing in ${topN} of ${swings.length}: ${h.title}.`) : null),
+    card ? drillSection(card) : null,
     swings.length ? swingList(session, actions) : null,
+    button('Clear this session', () => actions.clear(), 'btn link'),
     el('div', { class: 'actionbar' },
       button('Start again', () => actions.start(), 'btn'),
-      unsaved ? button(`Save ${unsaved === swings.length ? 'all' : unsaved} to history`, () => actions.saveAll(), 'btn primary') : button('Back to Home', () => actions.home(), 'btn primary')),
-    el('div', { class: 'row', style: { justifyContent: 'center' } }, button('Clear this session', () => actions.clear(), 'btn link')));
+      unsaved ? button(`Save ${unsaved === swings.length ? 'all' : unsaved} to history`, () => actions.saveAll(), 'btn primary') : button('Back to Home', () => actions.home(), 'btn primary')));
 }
 
 export { STATUS };

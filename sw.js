@@ -4,7 +4,7 @@
 // files never change between builds. Video is never touched: clips are gallery blobs, and
 // the dev server's /clips/ range requests pass straight through.
 // VERSION must match BUILD in src/app.js (a test checks it).
-const VERSION = '2026-09-27.6';
+const VERSION = '2026-09-30.1';
 const SHELL = `shell-${VERSION}`;
 const HEAVY = 'tracker-v1';
 const SHELL_FILES = [
@@ -12,6 +12,8 @@ const SHELL_FILES = [
   './index.html',
   './styles.css',
   './manifest.webmanifest',
+  './fonts/inter-latin.woff2',
+  './fonts/playfair-display-latin.woff2',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',

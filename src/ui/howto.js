@@ -1,5 +1,5 @@
 // "How to film" panel: the capture protocol in plain words.
-import { el } from './dom.js';
+import { el, stepsList } from './dom.js';
 
 export const HOWTO_STEPS = [
   'Prop the phone still: mini tripod, or leaning on the bag or the bay divider. Portrait or landscape both work.',
@@ -13,9 +13,9 @@ export const HOWTO_STEPS = [
 ];
 
 export function renderHowto(open = false) {
-  const d = el('details', { class: 'card', open },
+  return el('details', { class: 'fold', open },
     el('summary', {}, 'How to film'),
-    el('ol', {}, HOWTO_STEPS.map((s) => el('li', {}, s))),
-    el('p', { class: 'muted small' }, 'The clip never leaves the phone. Tracking runs in the browser.'));
-  return d;
+    el('div', { class: 'stack' },
+      stepsList(HOWTO_STEPS),
+      el('p', { class: 'caption' }, 'The clip never leaves the phone. Tracking runs in the browser.')));
 }
