@@ -16,6 +16,24 @@
 <link rel="preload" href="fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/playfair-display-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
+<script>
+  // The look picked in Settings goes on before the first paint, so the page never flashes the
+  // current design first. Ids and bar colours mirror src/looks.js (a test checks they agree).
+  (function () {
+    var bars = { launch: '#0C100F', tour: '#0B0B0B', yardage: '#EEF0E9' };
+    try {
+      var look = JSON.parse(localStorage.getItem('swing-coach.settings') || '{}').look;
+      if (!Object.prototype.hasOwnProperty.call(bars, look)) return;
+      var link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.id = 'look';
+      link.href = 'looks/' + look + '.css';
+      link.setAttribute('blocking', 'render');
+      document.head.appendChild(link);
+      document.querySelector('meta[name="theme-color"]').setAttribute('content', bars[look]);
+    } catch (e) { /* no storage: the current design */ }
+  })();
+</script>
 </head>
 <body data-screen="tab">
 <header class="topbar">

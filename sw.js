@@ -4,7 +4,7 @@
 // files never change between builds. Video is never touched: clips are gallery blobs, and
 // the dev server's /clips/ range requests pass straight through.
 // VERSION must match BUILD in src/app.js (a test checks it).
-const VERSION = '2026-10-01.1';
+const VERSION = '2026-10-02.1';
 const SHELL = `shell-${VERSION}`;
 const HEAVY = 'tracker-v1';
 const SHELL_FILES = [
@@ -14,6 +14,23 @@ const SHELL_FILES = [
   './manifest.webmanifest',
   './fonts/inter-latin.woff2',
   './fonts/playfair-display-latin.woff2',
+  './looks/launch.css',
+  './looks/tour.css',
+  './looks/yardage.css',
+  './looks/contours.svg',
+  './fonts/barlow-latin-400.woff2',
+  './fonts/barlow-latin-500.woff2',
+  './fonts/barlow-latin-600.woff2',
+  './fonts/barlow-latin-700.woff2',
+  './fonts/barlow-condensed-latin-600.woff2',
+  './fonts/barlow-condensed-latin-700.woff2',
+  './fonts/barlow-condensed-latin-800.woff2',
+  './fonts/archivo-latin.woff2',
+  './fonts/archivo-latin-italic.woff2',
+  './fonts/ibm-plex-sans-latin.woff2',
+  './fonts/ibm-plex-mono-latin-400.woff2',
+  './fonts/ibm-plex-mono-latin-500.woff2',
+  './fonts/ibm-plex-mono-latin-600.woff2',
   './icons/icon.svg',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -28,6 +45,7 @@ const SHELL_FILES = [
   './src/knowledge.js',
   './src/landmarks.js',
   './src/live.js',
+  './src/looks.js',
   './src/markers.js',
   './src/metrics.js',
   './src/norms.js',

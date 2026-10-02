@@ -1,10 +1,21 @@
-Fonts in this folder, both under the SIL Open Font License 1.1 (text below).
+Fonts in this folder, all under the SIL Open Font License 1.1 (text below).
 
 inter-latin.woff2: Inter, Latin subset, variable weight. Fontsource 5.3.0 build of Google Fonts v20.
 Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter) Inter-Italic[opsz,wght].ttf: Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
 
 playfair-display-latin.woff2: Playfair Display, Latin subset, variable weight. Fontsource 5.3.0 build.
 Copyright 2017 The Playfair Display Project Authors (https://github.com/clauseggers/Playfair-Display), with Reserved Font Name "Playfair Display". PlayfairDisplay-Italic[wght].ttf: Copyright 2017 The Playfair Display Project Authors (https://github.com/clauseggers/Playfair-Display), with Reserved Font Name "Playfair Display".
+
+The three trial looks (looks/*.css) use these. All are unmodified Fontsource 5.3.0 builds, Latin subset.
+
+barlow-latin-400/500/600/700.woff2 and barlow-condensed-latin-600/700/800.woff2: Barlow and Barlow Condensed (looks/launch.css).
+Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow)
+
+archivo-latin.woff2 and archivo-latin-italic.woff2: Archivo, variable weight and width (looks/tour.css).
+Copyright 2020 The Archivo Project Authors (https://github.com/Omnibus-Type/Archivo)
+
+ibm-plex-sans-latin.woff2: IBM Plex Sans, variable weight and width. Copyright 2019 IBM Corp. All rights reserved.
+ibm-plex-mono-latin-400/500/600.woff2: IBM Plex Mono. Copyright 2017 IBM Corp. All rights reserved. (looks/yardage.css)
 
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

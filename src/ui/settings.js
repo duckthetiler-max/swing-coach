@@ -3,6 +3,7 @@ import { el, field, select, switchRow, segmented, button, listRow, linkRow, sect
 import { renderHowto } from './howto.js';
 import { SWING_MODELS } from '../knowledge.js';
 import { CLUB_LIST, GROUPS, normaliseBag } from '../clubs.js';
+import { LOOKS } from '../looks.js';
 
 export function renderSettings(root, ctx) {
   const { settings, build, app, onSave, onKnowledge } = ctx;
@@ -62,7 +63,7 @@ export function renderSettings(root, ctx) {
   ];
 
   if (!simple) {
-    root.replaceChildren(el('div', { class: 'page' }, title, simpleCard, ...cards, appCard(app, build)));
+    root.replaceChildren(el('div', { class: 'page' }, title, lookCard(settings, onSave), simpleCard, ...cards, appCard(app, build)));
     return;
   }
 
@@ -76,9 +77,19 @@ export function renderSettings(root, ctx) {
     select(modelOptions, settings.swingModel, (v) => onSave({ swingModel: v })),
     el('p', { class: 'hint' }, `${model.summary} The app never guesses a named method from video; pick one only if you are working on it with a coach.`));
   root.replaceChildren(el('div', { class: 'page' },
-    title, you, bagCard, simpleCard,
+    title, lookCard(settings, onSave), you, bagCard, simpleCard,
     el('details', { class: 'more' }, el('summary', {}, 'Advanced'), el('div', { class: 'page' }, modelCard, ...advanced)),
     appCard(app, build)));
+}
+
+/** The trial looks: the one in use says On, the others are a tap away. */
+function lookCard(settings, onSave) {
+  return section('Look',
+    el('p', { class: 'caption' }, 'A trial. Try each look on your own swings. The one you keep stays and the others go.'),
+    el('div', { class: 'rows' }, LOOKS.map((l) => {
+      const on = l.id === settings.look;
+      return listRow(l.name, l.blurb, el('span', { class: `state${on ? '' : ' off'}` }, on ? 'On' : 'Try'), on ? null : () => onSave({ look: l.id }));
+    })));
 }
 
 function bagPicker(settings, onSave) {
