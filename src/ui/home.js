@@ -27,7 +27,7 @@ export function renderHome(root, ctx) {
   const intro = el('section', { class: 'sec' },
     el('p', { class: 'kicker muted' }, 'Analyse a swing'),
     hero('Film one swing. Fix one thing.'),
-    el('p', { class: 'muted' }, 'Film a swing in slow motion with the camera app, then pick it here. The phone tracks your body and tells you the one thing to fix next.'));
+    el('p', { class: 'muted' }, 'Film in slow motion with the camera app, then pick the clip here.'));
 
   const start = el('section', { class: 'sec' },
     el('h2', { class: 'kicker' }, `Club · ${clubLabel(settings.club)}`),
@@ -35,7 +35,7 @@ export function renderHome(root, ctx) {
     el('p', { class: 'caption' }, 'Your bag. Add or drop clubs in Settings.'),
     el('h2', { class: 'kicker' }, 'Camera angle'),
     segmented(ANGLE_OPTIONS, viewChoice, (v) => onViewChoice(v), 'Camera angle'),
-    el('p', { class: 'caption' }, 'Auto reads the angle from your shoulders. Down-the-line first if you can only film one.'),
+    el('p', { class: 'caption' }, 'Auto reads the angle from your shoulders.'),
     button('Analyse a clip', () => fileInput.click(), 'btn primary big'),
     button('Auto capture (experimental)', () => onCapture(), 'btn big'),
     button('Record one clip with the camera app', () => camInput.click(), 'btn link'),
