@@ -4,7 +4,6 @@
 // time, so the pure helpers (mergeSettings) can be tested in Node.
 
 import { CLUB_IDS, DEFAULT_BAG, isClub, normaliseBag } from './clubs.js';
-import { LOOK_IDS } from './looks.js';
 
 const DB_NAME = 'swing-coach';
 const DB_VERSION = 1;
@@ -24,7 +23,6 @@ export const DEFAULT_SETTINGS = Object.freeze({
   camera: 'environment',
   bag: DEFAULT_BAG,
   overlayStyle: 'markers',
-  look: 'editorial',
   simpleMode: true,
 });
 
@@ -57,8 +55,6 @@ export function normaliseSetting(key, value) {
       return isClub(value) ? value : undefined;
     case 'bag':
       return Array.isArray(value) ? normaliseBag(value) : undefined;
-    case 'look':
-      return LOOK_IDS.includes(value) ? value : undefined;
     case 'overlayStyle':
       return value === 'markers' || value === 'figure' ? value : undefined;
     case 'swingModel':

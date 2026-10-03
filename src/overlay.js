@@ -10,7 +10,8 @@ import {
 } from './landmarks.js';
 
 // White on the picture, the lead side solid, the trail side a quieter grey, a dark halo so
-// it reads on any footage. The only colour is a band square on a number's label.
+// it reads on any footage. The only colour is the vermilion slash on the position's tag and a
+// band tag on a number's label, as in the app (styles.css).
 const DEFAULTS = Object.freeze({
   handed: 'right',
   scaleX: 1,
@@ -26,7 +27,29 @@ const DEFAULTS = Object.freeze({
 });
 
 const PHASE_LABEL = { p1: 'P1 Address', p4: 'P4 Top', p7: 'P7 Impact', p10: 'P10 Finish' };
-const SANS = 'Inter, "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif';
+const SANS = 'Archivo, "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif';
+const INK = '#0b0b0b';
+const HOT = '#d9330e';
+const MUTED = '#5c5c57';
+
+/** Archivo at a weight and size; italic and condensed for the tags and the big numbers. */
+function setFont(ctx, weight, size, { italic = false, stretch = 'normal' } = {}) {
+  ctx.font = `${italic ? 'italic ' : ''}${weight} ${size}px ${SANS}`;
+  if ('fontStretch' in ctx) ctx.fontStretch = stretch;
+}
+
+/** A slanted tag, like the band tags and the slash in the title bar. */
+function slant(ctx, x, y, w, h, color) {
+  const k = Math.min(w / 2, h * 0.35);
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x + k, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w - k, y + h);
+  ctx.lineTo(x, y + h);
+  ctx.closePath();
+  ctx.fill();
+}
 
 function options(opts) {
   return { ...DEFAULTS, ...(opts || {}) };
@@ -287,20 +310,25 @@ export function drawGuides(ctx, frame, view, phase, opts) {
   }
   const g = drawGuideSet(ctx, frame, o, { color: withAlpha(o.ink, 0.85), dashed: false, width: Math.max(1, width * 0.8) });
 
-  // The position's name on a white tag in the corner, like a caption on a print.
+  // The position's name on a black tag in the corner, the vermilion slash before it, like
+  // the app's title bar.
   if (o.label && PHASE_LABEL[phase]) {
-    const size = Math.max(10, Math.round(ctx.canvas.width / 32));
+    const size = Math.max(11, Math.round(ctx.canvas.width / 27));
     const text = `${PHASE_LABEL[phase]}${view === 'fo' ? ' · face-on' : view === 'dtl' ? ' · down-the-line' : ''}`.toUpperCase();
     ctx.save();
-    ctx.font = `700 ${size}px ${SANS}`;
-    if ('letterSpacing' in ctx) ctx.letterSpacing = `${(size * 0.06).toFixed(1)}px`;
-    ctx.textBaseline = 'top';
-    const pad = Math.round(size * 0.7);
-    const tw = ctx.measureText(text).width;
+    setFont(ctx, 900, size, { italic: true, stretch: 'condensed' });
+    if ('letterSpacing' in ctx) ctx.letterSpacing = `${(size * 0.04).toFixed(1)}px`;
+    ctx.textBaseline = 'alphabetic';
+    const pad = Math.round(size * 0.6);
+    const m = ctx.measureText(text);
+    const asc = m.actualBoundingBoxAscent || size * 0.72;
+    const h = Math.round(asc + pad * 1.6);
+    const mark = Math.round(asc * 0.9);
+    ctx.fillStyle = INK;
+    ctx.fillRect(pad, pad, pad * 2.2 + mark + m.width, h);
+    slant(ctx, pad * 1.7, pad + (h - asc) / 2, mark, asc, HOT);
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(pad, pad, tw + pad * 2, size + pad * 1.6);
-    ctx.fillStyle = '#111111';
-    ctx.fillText(text, pad * 2, pad * 1.8);
+    ctx.fillText(text, pad * 2.3 + mark, pad + (h + asc) / 2);
     ctx.restore();
   }
   return !!g;
@@ -326,7 +354,7 @@ const MARKER_JOINTS = [
 ];
 
 // The same three band colours as the report card (styles.css --band-*).
-export const BAND_COLOR = Object.freeze({ green: '#2e7d4f', amber: '#b8860b', red: '#b3261e', na: '#8c8c8c' });
+export const BAND_COLOR = Object.freeze({ green: '#11804a', amber: '#a96500', red: '#d42a1a', na: '#9a9a94' });
 
 /**
  * Draw the tracked joints as markers: thin bones, a dot on every joint (lead side in the
@@ -416,8 +444,8 @@ function anchorPoint(frame, anchor, o) {
 /**
  * Write measured numbers on the picture. callouts = [{ label, text, band, anchor }] from
  * markers.js. Each gets a ring on its body part, a leader line and a two-line white label
- * at the nearer edge of the picture: the band square and the name in small capitals, then
- * the number. Labels on the same side stack downward.
+ * at the nearer edge of the picture: the band tag and the name in small capitals, then the
+ * number in big italic capitals. Labels on the same side stack downward.
  */
 export function drawCallouts(ctx, frame, callouts, opts) {
   if (!validFrame(frame) || !Array.isArray(callouts) || !callouts.length) return 0;
@@ -443,12 +471,12 @@ export function drawCallouts(ctx, frame, callouts, opts) {
     let side = a.x < centreX - 2 ? 'left' : a.x > centreX + 2 ? 'right' : (flip ? 'left' : 'right');
     if (Math.abs(a.x - centreX) <= 2) flip = !flip;
 
-    ctx.font = `700 ${size}px ${SANS}`;
+    setFont(ctx, 900, size, { italic: true, stretch: 'condensed' });
     tracking(0);
-    const wText = ctx.measureText(c.text).width;
-    ctx.font = `700 ${small}px ${SANS}`;
-    tracking(small * 0.07);
-    const wLabel = ctx.measureText(c.label.toUpperCase()).width + sq + Math.round(small * 0.6);
+    const wText = ctx.measureText(c.text.toUpperCase()).width;
+    setFont(ctx, 800, small, { italic: true });
+    tracking(small * 0.06);
+    const wLabel = ctx.measureText(c.label.toUpperCase()).width + sq * 1.6 + Math.round(small * 0.6);
     tracking(0);
     const boxW = Math.min(W * 0.62, Math.max(wText, wLabel) + pad * 2);
     const boxH = small + size + pad * 2 + 4;
@@ -471,23 +499,22 @@ export function drawCallouts(ctx, frame, callouts, opts) {
     stroke(ctx, from, edge, '#ffffff', Math.max(1.25, size * 0.1));
   }
 
-  // Pass 2: labels on top. White tag, band square and the name in small capitals, the number.
+  // Pass 2: labels on top. White label, band tag and the name in small capitals, the number.
   for (const { c, color, x, y, boxW } of placed) {
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(x, y, boxW, small + size + pad * 2 + 4);
     const tx = x + pad;
     const room = boxW - pad * 2;
-    ctx.fillStyle = color;
-    ctx.fillRect(tx, y + pad + Math.round((small - sq) / 2), sq, sq);
-    ctx.fillStyle = '#555555';
-    ctx.font = `700 ${small}px ${SANS}`;
-    tracking(small * 0.07);
-    const lx = tx + sq + Math.round(small * 0.6);
+    slant(ctx, tx, y + pad + Math.round((small - sq) / 2), Math.round(sq * 1.6), sq, color);
+    ctx.fillStyle = MUTED;
+    setFont(ctx, 800, small, { italic: true });
+    tracking(small * 0.06);
+    const lx = tx + Math.round(sq * 1.6) + Math.round(small * 0.6);
     ctx.fillText(c.label.toUpperCase(), lx, y + pad, Math.max(1, room - (lx - tx)));
     tracking(0);
-    ctx.fillStyle = '#111111';
-    ctx.font = `700 ${size}px ${SANS}`;
-    ctx.fillText(c.text, tx, y + pad + small + 4, room);
+    ctx.fillStyle = INK;
+    setFont(ctx, 900, size, { italic: true, stretch: 'condensed' });
+    ctx.fillText(c.text.toUpperCase(), tx, y + pad + small + 4, room);
   }
   ctx.restore();
   return placed.length;

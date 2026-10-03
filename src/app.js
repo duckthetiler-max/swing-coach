@@ -7,7 +7,6 @@ import { estimateScale } from './scale.js';
 import { computeMetrics, buildQuality } from './metrics.js';
 import { coach } from './coach.js';
 import { saveSwing, getSwing, deleteSwing, listSwings, getSettings, saveSettings, hasStoredSettings, firstRunPatch } from './store.js';
-import { lookById } from './looks.js';
 import { composeStill, drawBody, drawGuides, drawCallouts } from './overlay.js';
 import { calloutsFor } from './markers.js';
 import { renderHome } from './ui/home.js';
@@ -22,7 +21,7 @@ import { openCamera, closeCamera, cameraSettings, LiveCapture, retrackPictures, 
 import { buildLiveClip } from './live.js';
 import { renderCapture, paintLive, refreshLiveCounters } from './ui/capture.js';
 
-export const BUILD = '2026-10-02.1';
+export const BUILD = '2026-10-03.1';
 
 const root = document.getElementById('app');
 const state = {
@@ -60,36 +59,6 @@ function setChrome({ title, tab = null, back = null, bare = false }) {
   document.body.dataset.screen = bare ? 'bare' : back ? 'sub' : 'tab';
   for (const a of chrome.tabs) a.classList.toggle('active', a.dataset.tab === tab);
   document.title = title === 'Swing Coach' ? title : `${title}, Swing Coach`;
-}
-
-// ---------- the look: the trial stylesheets picked in Settings ----------
-
-let lookToken = 0;
-/**
- * Put the chosen look's stylesheet on the page and colour the browser bar to match. The new
- * sheet loads before the old one comes off, so a switch never flashes the current design; a
- * newer switch wins over one still loading. index.html does the same at load, before paint.
- */
-function applyLook(id) {
-  const look = lookById(id);
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', look.themeColor);
-  const token = ++lookToken;
-  const sheets = () => [...document.querySelectorAll('link[rel="stylesheet"][href^="looks/"]')];
-  const now = sheets();
-  if (!look.css) { for (const l of now) l.remove(); return; }
-  if (now.length === 1 && now[0].getAttribute('href') === look.css) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = look.css;
-  const swap = () => {
-    if (token !== lookToken) { link.remove(); return; }
-    for (const l of sheets()) if (l !== link) l.remove();
-    link.id = 'look';
-  };
-  link.addEventListener('load', swap, { once: true });
-  link.addEventListener('error', swap, { once: true });
-  document.head.append(link);
 }
 
 let lastScreen = null;
@@ -156,11 +125,7 @@ async function route() {
       setChrome({ title: 'Settings', tab: 'settings' });
       renderSettings(root, {
         settings: state.settings, build: BUILD, app: appInfo(),
-        onSave: (patch) => {
-          state.settings = saveSettings(patch);
-          if ('look' in patch) applyLook(state.settings.look);
-          route();
-        },
+        onSave: (patch) => { state.settings = saveSettings(patch); route(); },
         onKnowledge: () => nav('#knowledge'),
       });
       break;
@@ -575,10 +540,10 @@ function recomputeFor(c) {
   c.coaching = coach(c.analysis, { club: c.club, protect: false, handed: s.handed, model: s.swingModel });
 }
 
-/** The labels on the pictures are set in Inter; wait for it so no still is drawn in a fallback. */
+/** The labels on the pictures are set in Archivo; wait for it so no still is drawn in a fallback. */
 async function fontsReady() {
   try {
-    if (document.fonts) await Promise.all([document.fonts.load('700 16px Inter'), document.fonts.ready]);
+    if (document.fonts) await Promise.all([document.fonts.load('italic 900 16px Archivo'), document.fonts.load('800 16px Archivo'), document.fonts.ready]);
   } catch { /* draw with the fallback face */ }
 }
 
@@ -752,8 +717,6 @@ async function start() {
   await settleFirstRun();
   const params = new URLSearchParams(location.search);
   if (params.get('club')) state.settings = saveSettings({ club: params.get('club') });
-  if (params.get('look')) state.settings = saveSettings({ look: params.get('look') });
-  applyLook(state.settings.look);
   registerWorker();
   if (params.get('screen') === 'capture') { state.session = null; nav('#capture'); return; }
   if (params.get('screen') && showDevScreen(params.get('screen'))) return;
